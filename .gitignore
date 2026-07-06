@@ -1,0 +1,72 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Flutter
+apps/customer_app/build/
+apps/customer_app/.dart_tool/
+apps/customer_app/.packages
+apps/customer_app/.pub/
+apps/customer_app/pubspec.lock
+apps/driver_app/build/
+apps/driver_app/.dart_tool/
+apps/driver_app/.packages
+apps/driver_app/.pub/
+apps/driver_app/pubspec.lock
+
+# React
+apps/admin_dashboard/node_modules/
+apps/admin_dashboard/dist/
+apps/admin_dashboard/.vite/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Database backups
+*.dump
+*.sql
+
+# Uploaded files
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Docker volumes
+docker/postgres_data/
+docker/redis_data/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Testing
+.cache/
