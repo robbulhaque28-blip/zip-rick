@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "527097229423",
+    "project_id": "zip-rick-e2784",
+    "storage_bucket": "zip-rick-e2784.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:527097229423:android:edde0de72de28f36d69d9a",
+        "android_client_info": {
+          "package_name": "com.ziprick.driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAthiSpmrf3-Sqas3K8N1GFZze-T0-kzrw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
