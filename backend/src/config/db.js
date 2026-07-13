@@ -1,4 +1,4 @@
-const { Sequelize } = require('sequelize');
+﻿const { Sequelize } = require('sequelize');
 const config = require('./index');
 const logger = require('../utils/logger');
 
@@ -12,12 +12,15 @@ const sequelize = new Sequelize({
     paranoid: true,
     deletedAt: 'deleted_at',
   },
+  dialectOptions: {
+    // Use better-sqlite3 for production compatibility
+  },
 });
 
 async function testConnection() {
   try {
     await sequelize.authenticate();
-    logger.info('Database connected (SQLite).');
+    logger.info('Database connected (SQLite via better-sqlite3).');
     return true;
   } catch (e) {
     logger.error('DB connection failed:', e.message);

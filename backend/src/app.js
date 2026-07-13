@@ -11,7 +11,7 @@ const routes = require('./routes');
 
 const app = express();
 
-// CORS - Allow ALL origins in development
+// CORS - Allow all origins in development
 app.use(cors());
 app.options('*', cors());
 

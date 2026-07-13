@@ -88,11 +88,11 @@ const schemas = {
   }),
 
   otp: Joi.object({
-    phone: Joi.string()
-      .pattern(/^\+?[1-9]\d{9,14}$/)
-      .required(),
+    phone: Joi.string().pattern(/^\+?[1-9]\d{9,14}$/).required(),
     otp: Joi.string().length(6).required(),
-  }),
+    full_name: Joi.string().allow('', null),
+    role: Joi.string().valid('customer', 'driver').default('customer'),
+}),
 
   location: Joi.object({
     latitude: Joi.number().min(-90).max(90).required(),

@@ -108,6 +108,8 @@ Driver.init(
 
     // Commission
     commission_rate: { type: DataTypes.DECIMAL(5, 2), defaultValue: 10.0 },
+  commission_due: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
+  total_commission_paid: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
   },
   {
     sequelize,

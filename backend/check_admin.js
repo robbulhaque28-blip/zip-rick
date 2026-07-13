@@ -1,11 +1,26 @@
-const { sequelize } = require('./src/models');
-async function run() {
-  const [users] = await sequelize.query("SELECT * FROM users WHERE role = 'admin'");
-  console.log('Admin Users:', JSON.stringify(users, null, 2));
-  
-  const [admins] = await sequelize.query("SELECT email, role, is_active FROM admin_users");
-  console.log('Admin Table:', JSON.stringify(admins, null, 2));
-  
-  process.exit(0);
+﻿const { User, AdminUser } = require('./src/models');
+
+async function checkAdmin() {
+  try {
+    const users = await User.findAll({
+      where: { email: 'admin@zip-rick.com' }
+    });
+    console.log('Users with admin email:', users.length);
+    
+    const admins = await AdminUser.findAll({
+      where: { email: 'admin@zip-rick.com' }
+    });
+    console.log('Admin users with admin email:', admins.length);
+    
+    if (admins.length > 0) {
+      console.log('✅ Admin user already exists!');
+      console.log('Try logging in with: admin@zip-rick.com / admin123');
+    }
+    
+  } catch (error) {
+    console.error('Error:', error.message);
+  }
+  process.exit();
 }
-run().catch(e => { console.log('ERROR:', e.message); process.exit(1); });
+
+checkAdmin();

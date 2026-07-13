@@ -1,67 +1,97 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Grid, Card, CardContent, Typography, Select, MenuItem, FormControl } from '@mui/material';
-import { PeopleAlt, DirectionsCar, AttachMoney } from '@mui/icons-material';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+﻿import React, { useState, useEffect } from 'react';
 
-const API = 'http://localhost:4001/api/v1';
+const API = 'http://localhost:3000/api/v1';
 
 export default function DashboardPage() {
-  const [period, setPeriod] = useState('7');
-  const [stats, setStats] = useState({ total_customers: 0, total_drivers: 0, active_rides: 0, revenue: { today: 0 } });
+  const [stats, setStats] = useState({
+    total_customers: 0, total_drivers: 0, pending_drivers: 0,
+    active_rides: 0, today_rides: 0, revenue: { total: 0, today: 0 }
+  });
+  const [days, setDays] = useState('7');
 
-  useEffect(() => {
-    fetch(API + '/admin/dashboard')
-      .then(r => r.json())
-      .then(d => { if (d.data?.overview) setStats(d.data.overview); })
-      .catch(() => {});
-  }, []);
+  const loadData = async () => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) return;
+      const res = await fetch(API + '/admin/dashboard', {
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      const data = await res.json();
+      if (data.success && data.data && data.data.overview) {
+        setStats(data.data.overview);
+      }
+    } catch (e) {}
+  };
+
+  const loadRevenue = async () => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) return;
+      const res = await fetch(API + '/admin/revenue?days=' + days, {
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        // We can show the revenue data from the response
+        console.log('Revenue data for last', days, 'days:', data.data);
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadRevenue(); }, [days]);
 
   const chartData = [
-    { day: 'Mon', revenue: 4500, rides: 45 }, { day: 'Tue', revenue: 5200, rides: 52 },
-    { day: 'Wed', revenue: 4800, rides: 48 }, { day: 'Thu', revenue: 6100, rides: 61 },
-    { day: 'Fri', revenue: 7200, rides: 72 }, { day: 'Sat', revenue: 8900, rides: 89 },
+    { day: 'Mon', revenue: 4500, rides: 45 },
+    { day: 'Tue', revenue: 5200, rides: 52 },
+    { day: 'Wed', revenue: 4800, rides: 48 },
+    { day: 'Thu', revenue: 6100, rides: 61 },
+    { day: 'Fri', revenue: 7200, rides: 72 },
+    { day: 'Sat', revenue: 8900, rides: 89 },
     { day: 'Sun', revenue: 5600, rides: 56 },
   ];
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Zip-Rick Dashboard</Typography>
-        <FormControl size="small" sx={{ minWidth: 150 }}>
-          <Select value={period} onChange={e => setPeriod(e.target.value)}>
-            <MenuItem value="7">Last 7 days</MenuItem>
-            <MenuItem value="30">Last 30 days</MenuItem>
-          </Select>
-        </FormControl>
-      </Box>
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {[
-          { title: 'Total Customers', value: (stats.total_customers || 0).toLocaleString(), icon: <PeopleAlt />, color: '#6C63FF' },
-          { title: 'Total Drivers', value: (stats.total_drivers || 0).toLocaleString(), icon: <DirectionsCar />, color: '#00D9A6' },
-          { title: 'Active Rides', value: (stats.active_rides || 0).toString(), icon: <DirectionsCar />, color: '#FFA726' },
-          { title: 'Revenue Today', value: '\u20B9' + (stats.revenue?.today || 0).toLocaleString(), icon: <AttachMoney />, color: '#66BB6A' },
-        ].map((s, i) => (
-          <Grid item xs={12} sm={6} md={3} key={i}>
-            <Card sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <Box><Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{s.title}</Typography>
-                <Typography variant="h4" sx={{ fontWeight: 700 }}>{s.value}</Typography></Box>
-                <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: s.color + '15', color: s.color }}>{s.icon}</Box>
-              </Box>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-      <Card><CardContent>
-        <Typography variant="h6" sx={{ mb: 2 }}>Revenue & Rides</Typography>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="day" /><YAxis /><Tooltip />
-            <Bar dataKey="revenue" fill="#6C63FF" radius={[4,4,0,0]} name="Revenue" />
-            <Bar dataKey="rides" fill="#00D9A6" radius={[4,4,0,0]} name="Rides" />
-          </BarChart>
-        </ResponsiveContainer>
-      </CardContent></Card>
-    </Box>
+    <div style={{ padding: 24, fontFamily: 'sans-serif', maxWidth: 1200 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <h1 style={{ margin: 0, fontSize: 24 }}>Zip-Rick Dashboard</h1>
+        <select 
+          value={days} 
+          onChange={e => setDays(e.target.value)}
+          style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #ccc', fontSize: 13, background: 'white', cursor: 'pointer' }}
+        >
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+        </select>
+      </div>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
+        <Card title="Total Customers" value={stats.total_customers || 0} color="#6C63FF" />
+        <Card title="Total Drivers" value={stats.total_drivers || 0} color="#00D9A6" />
+        <Card title="Active Rides" value={stats.active_rides || 0} color="#FFA726" />
+        <Card title="Revenue (Last {days} days)" value={"\u20B9" + ((stats.revenue?.total || 0)).toLocaleString()} color="#66BB6A" />
+      </div>
+      
+      <div style={{ background: 'white', borderRadius: 10, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}>
+        <h4 style={{ margin: '0 0 12px 0', fontSize: 14, color: '#666' }}>Revenue Overview</h4>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 80 }}>
+          {chartData.map((d, i) => (
+            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{ width: '100%', background: '#6C63FF', height: Math.round(d.revenue / 120), borderRadius: '3px 3px 0 0' }}></div>
+              <span style={{ fontSize: 9, marginTop: 2, color: '#999' }}>{d.day}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Card({ title, value, color }) {
+  return (
+    <div style={{ padding: 20, borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.1)', background: 'white' }}>
+      <p style={{ color: '#666', margin: '0 0 6px 0', fontSize: 13 }}>{title}</p>
+      <h2 style={{ margin: 0, color: color, fontSize: 28 }}>{value}</h2>
+    </div>
   );
 }
