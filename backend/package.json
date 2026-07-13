@@ -15,7 +15,8 @@
     "seed": "npx sequelize-cli db:seed:all",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
-    "docs": "node src/utils/swagger.js"
+    "docs": "node src/utils/swagger.js",
+    "postinstall": "npm rebuild sqlite3"
   },
   "dependencies": {
     "@googlemaps/google-maps-services-js": "^3.3.38",
@@ -79,5 +80,8 @@
         "statements": 70
       }
     }
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
