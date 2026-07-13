@@ -24,6 +24,11 @@ const config = Object.freeze({
   },
   logging: { level: 'debug', dir: './logs' },
   corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : '*',
+  rateLimit: {
+    windowMs: 60000,
+    maxRequests: 100,
+    authMax: 30,
+  },
 });
 
 module.exports = config;
