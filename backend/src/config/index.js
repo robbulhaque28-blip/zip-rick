@@ -1,4 +1,4 @@
-const dotenv = require('dotenv');
+﻿const dotenv = require('dotenv');
 const path = require('path');
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
@@ -7,14 +7,14 @@ const config = Object.freeze({
   port: parseInt(process.env.PORT, 10) || 3000,
   apiPrefix: process.env.API_PREFIX || '/api/v1',
   db: {
+    dialect: process.env.DB_DIALECT || 'sqlite',
     storage: './database.sqlite',
-    dialect: 'sqlite',
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT, 10) || 5432,
+    name: process.env.DB_NAME || 'zip_rick',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
     logging: false,
-  },
-  redis: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT, 10) || 6379,
-    password: process.env.REDIS_PASSWORD,
   },
   jwt: {
     secret: process.env.JWT_SECRET || 'dev-secret',
@@ -22,28 +22,8 @@ const config = Object.freeze({
     refreshSecret: process.env.JWT_REFRESH_SECRET || 'dev-refresh',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
-  firebase: {
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-  },
-  googleMaps: { apiKey: process.env.GOOGLE_MAPS_API_KEY },
-  razorpay: {
-    keyId: process.env.RAZORPAY_KEY_ID,
-    keySecret: process.env.RAZORPAY_KEY_SECRET,
-  },
-  rateLimit: {
-    windowMs: 60000,
-    maxRequests: 100,
-    authMax: 30,
-  },
   logging: { level: 'debug', dir: './logs' },
-  corsOrigins: '*',
-  registrationFee: {
-    promotional: 499,
-    standard: 999,
-    promotionActive: true,
-  },
+  corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : '*',
 });
 
 module.exports = config;
