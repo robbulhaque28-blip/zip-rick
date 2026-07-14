@@ -5,6 +5,7 @@ const logger = require('../utils/logger');
 let sequelize;
 
 if (process.env.DATABASE_URL) {
+  console.log('Using DATABASE_URL for connection');
   sequelize = new Sequelize(process.env.DATABASE_URL, {
     dialect: 'postgres',
     protocol: 'postgres',
@@ -21,6 +22,8 @@ if (process.env.DATABASE_URL) {
     },
   });
 } else {
+  console.log('Using individual DB params for connection');
+  console.log(`Host: ${config.db.host}, DB: ${config.db.name}, User: ${config.db.user}`);
   sequelize = new Sequelize(config.db.name, config.db.user, config.db.password, {
     host: config.db.host,
     port: config.db.port,
@@ -43,9 +46,12 @@ if (process.env.DATABASE_URL) {
 async function testConnection() {
   try {
     await sequelize.authenticate();
+    console.log('DB connected successfully');
     logger.info('DB connected');
     return true;
   } catch (e) {
+    console.error('DB connection failed with error:', e.message);
+    console.error('Full error:', e);
     logger.error('DB connection failed:', e.message);
     return false;
   }
