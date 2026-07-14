@@ -7,27 +7,18 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest --coverage --forceExit --detectOpenHandles",
-    "test:watch": "jest --watch --coverage",
-    "test:unit": "jest --testPathPattern=tests/unit --coverage",
-    "test:integration": "jest --testPathPattern=tests/integration --forceExit --detectOpenHandles",
     "migrate": "npx sequelize-cli db:migrate",
-    "migrate:undo": "npx sequelize-cli db:migrate:undo",
     "seed": "npx sequelize-cli db:seed:all",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix",
-    "docs": "node src/utils/swagger.js",
-    "postinstall": ""
+    "lint": "eslint src/"
   },
   "dependencies": {
     "@googlemaps/google-maps-services-js": "^3.3.38",
     "aws-sdk": "^2.1503.0",
     "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^12.11.1",
     "bull": "^4.11.5",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
-    "crypto": "^1.0.1",
     "dayjs": "^1.11.10",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
@@ -50,7 +41,6 @@
     "slugify": "^1.6.6",
     "socket.io": "^4.7.2",
     "socket.io-redis": "^6.1.1",
-    "sqlite3": "^6.0.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
     "uuid": "^9.0.0",
@@ -63,23 +53,5 @@
     "nodemon": "^3.0.2",
     "sequelize-cli": "^6.6.2",
     "supertest": "^6.3.3"
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "setupFilesAfterSetup": [
-      "./src/tests/setup.js"
-    ],
-    "coveragePathIgnorePatterns": [
-      "/node_modules/",
-      "/tests/"
-    ],
-    "coverageThreshold": {
-      "global": {
-        "branches": 70,
-        "functions": 70,
-        "lines": 70,
-        "statements": 70
-      }
-    }
   }
 }

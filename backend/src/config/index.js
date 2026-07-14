@@ -7,14 +7,20 @@ const config = Object.freeze({
   port: parseInt(process.env.PORT, 10) || 3000,
   apiPrefix: process.env.API_PREFIX || '/api/v1',
   db: {
-    dialect: process.env.DB_DIALECT || 'sqlite',
-    storage: './database.sqlite',
+    databaseUrl: process.env.DATABASE_URL,
+    dialect: process.env.DB_DIALECT || 'postgres',
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT, 10) || 5432,
     name: process.env.DB_NAME || 'zip_rick',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
-    logging: false,
+    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    pool: {
+      max: 20,
+      min: 5,
+      acquire: 30000,
+      idle: 10000,
+    },
   },
   jwt: {
     secret: process.env.JWT_SECRET || 'dev-secret',
@@ -22,12 +28,12 @@ const config = Object.freeze({
     refreshSecret: process.env.JWT_REFRESH_SECRET || 'dev-refresh',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
-  logging: { level: 'debug', dir: './logs' },
-  corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : '*',
+  logging: { level: process.env.LOG_LEVEL || 'debug', dir: './logs' },
+  corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : ['http://localhost:3000'],
   rateLimit: {
-    windowMs: 60000,
-    maxRequests: 100,
-    authMax: 30,
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 60000,
+    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100,
+    authMax: parseInt(process.env.RATE_LIMIT_AUTH_MAX, 10) || 30,
   },
 });
 
