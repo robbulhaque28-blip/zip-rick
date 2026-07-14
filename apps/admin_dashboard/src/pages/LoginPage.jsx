@@ -2,7 +2,7 @@
 import { Box, Card, CardContent, TextField, Button, Typography } from '@mui/material';
 import axios from 'axios';
 
-const API = 'http://localhost:3000/api/v1';
+const API = 'https://zip-rick-4.onrender.com/api/v1';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
