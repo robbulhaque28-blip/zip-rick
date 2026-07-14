@@ -8,7 +8,7 @@ import "dart:html" as html;
 
 void main() { WidgetsFlutterBinding.ensureInitialized(); runApp(const ZipRickDriverApp()); }
 
-final String baseUrl = "http://localhost:3000/api/v1";
+final String baseUrl = "https://zip-rick-4.onrender.com/api/v1";
 String? _authToken;
 
 class ZipRickDriverApp extends StatelessWidget { const ZipRickDriverApp({super.key});

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static String baseUrl = 'http://localhost:3000/api/v1';
+    static String baseUrl = 'https://zip-rick-4.onrender.com/api/v1';
 
   String? _token;
   String? get token => _token;
