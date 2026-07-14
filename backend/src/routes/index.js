@@ -44,38 +44,44 @@ router.use('/webhooks', webhookRoutes);
 // Setup endpoint - run once to seed admin user
 router.get('/setup', async (req, res) => {
   try {
+    const { sequelize } = require('../config/db');
+    const { User, AdminUser, Customer, Driver, Wallet } = require('../models');
     const bcrypt = require('bcryptjs');
     const { v4: uuidv4 } = require('uuid');
-    const { sequelize } = require('../config/db');
+
+    // Sync all models to create tables
+    await sequelize.sync({ force: false });
+    console.log('Database tables synced.');
+
     const password = await bcrypt.hash('Admin@123', 10);
     const userId = uuidv4();
     const adminId = uuidv4();
-    
+
     await sequelize.query(
       `INSERT INTO users (id, phone, full_name, role, is_phone_verified, created_at, updated_at)
        VALUES ('${userId}', '7000000000', 'Super Admin', 'admin', true, NOW(), NOW())
        ON CONFLICT (phone) DO NOTHING;`
     );
-    
+
     const user = await sequelize.query(
       `SELECT id FROM users WHERE phone = '7000000000' LIMIT 1;`,
       { type: sequelize.QueryTypes.SELECT }
     );
-    
+
     if (user && user.length > 0) {
       const existingAdmin = await sequelize.query(
         `SELECT id FROM admin_users WHERE user_id = '${user[0].id}' LIMIT 1;`,
         { type: sequelize.QueryTypes.SELECT }
       );
-      
+
       if (!existingAdmin || existingAdmin.length === 0) {
         await sequelize.query(
           `INSERT INTO admin_users (id, user_id, email, password_hash, role, permissions, is_active, created_at, updated_at)
            VALUES ('${adminId}', '${user[0].id}', 'admin@ziprick.com', '${password}', 'super_admin', '{"all": true}', true, NOW(), NOW());`
         );
-        res.json({ success: true, message: 'Admin created!' });
+        res.json({ success: true, message: 'Database synced and admin created!' });
       } else {
-        res.json({ success: true, message: 'Admin already exists.' });
+        res.json({ success: true, message: 'Database synced. Admin already exists.' });
       }
     } else {
       res.json({ success: false, message: 'Failed to find user.' });
@@ -83,4 +89,6 @@ router.get('/setup', async (req, res) => {
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
-});module.exports = router;
+});
+
+module.exports = router;
