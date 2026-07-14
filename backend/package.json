@@ -8,7 +8,7 @@
     "dev": "nodemon src/server.js",
     "test": "jest --coverage --forceExit --detectOpenHandles",
     "migrate": "npx sequelize-cli db:migrate",
-    "seed": "npx sequelize-cli db:seed:all",
+    "seed": "node src/seeders/seed.js",
     "lint": "eslint src/"
   },
   "dependencies": {
