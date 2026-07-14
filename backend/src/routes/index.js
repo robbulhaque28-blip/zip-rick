@@ -2,7 +2,6 @@
  * Routes Index
  * Aggregates all API routes under a single router.
  */
-
 const router = require('express').Router();
 const config = require('../config');
 
@@ -41,17 +40,18 @@ router.use('/maps', mapRoutes);
 router.use('/admin', adminRoutes);
 router.use('/webhooks', webhookRoutes);
 
-// Setup endpoint - run once to seed admin user
+// Setup endpoint - run once to seed admin user (protected by key)
 router.get('/setup', async (req, res) => {
+  const setupKey = req.query.key;
+  if (setupKey !== 'ziprick2026') {
+    return res.status(404).json({ success: false, message: 'Not found' });
+  }
   try {
     const { sequelize } = require('../config/db');
-    const { User, AdminUser, Customer, Driver, Wallet } = require('../models');
     const bcrypt = require('bcryptjs');
     const { v4: uuidv4 } = require('uuid');
 
-    // Sync all models to create tables
     await sequelize.sync({ force: false });
-    console.log('Database tables synced.');
 
     const password = await bcrypt.hash('Admin@123', 10);
     const userId = uuidv4();
