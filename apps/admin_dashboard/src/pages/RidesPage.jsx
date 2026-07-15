@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 
-const API = 'http://localhost:3000/api/v1';
+const API = 'https://zip-rick-4.onrender.com/api/v1';
 
 export default function RidesPage() {
   const [rides, setRides] = useState([]);
