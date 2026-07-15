@@ -21,11 +21,16 @@ module.exports = {
     const fare = await FareService.calculateFare({ distanceMeters: km * 1000, durationSeconds: km * 180 });
     return success(res, Object.assign({}, fare, { distance_km: parseFloat(km.toFixed(2)) }));
   }),
+
   bookRide: asyncHandler(async (req, res) => {
     const FareService = require("../services/FareService");
+    const RideMatchingService = require("../services/RideMatchingService");
+    const { getIO } = require("../sockets");
+
     const c = await Customer.findOne({ where: { user_id: req.userId } });
     if (!c) throw new ApiError(404, "Customer not found");
     const b = req.body;
+
     const R = 6371;
     const dLat = (b.drop_latitude - b.pickup_latitude) * Math.PI / 180;
     const dLon = (b.drop_longitude - b.pickup_longitude) * Math.PI / 180;
@@ -33,6 +38,7 @@ module.exports = {
     const cc = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     const km = R * cc;
     const fare = await FareService.calculateFare({ distanceMeters: km * 1000, durationSeconds: km * 180 });
+
     const ride = await Ride.create({
       ride_number: genNum(),
       customer_id: c.id,
@@ -51,17 +57,46 @@ module.exports = {
       payment_method: b.payment_method || "cash",
       status: "pending",
     });
+
     await RideStatusLog.create({ ride_id: ride.id, previous_status: null, new_status: "pending", changed_by: "customer" });
     ride.status = "searching"; await ride.save();
     await RideStatusLog.create({ ride_id: ride.id, previous_status: "pending", new_status: "searching", changed_by: "system" });
+
+    // Find nearby drivers within 2km and notify them via socket
+    const nearbyDrivers = await RideMatchingService.findNearbyDrivers(
+      parseFloat(b.pickup_latitude),
+      parseFloat(b.pickup_longitude),
+      2, // 2km range
+      20
+    );
+
+    const io = getIO();
+    if (io && nearbyDrivers.length > 0) {
+      const rideData = {
+        id: ride.id,
+        ride_number: ride.ride_number,
+        pickup_address: ride.pickup_address,
+        drop_address: ride.drop_address,
+        pickup_latitude: ride.pickup_latitude,
+        pickup_longitude: ride.pickup_longitude,
+        total_fare: ride.total_fare,
+      };
+
+      for (const { driver } of nearbyDrivers) {
+        io.to(`user:${driver.user_id}`).emit('ride:new_request', rideData);
+      }
+    }
+
     return created(res, { ride: { id: ride.id, ride_number: ride.ride_number, status: ride.status, total_fare: ride.total_fare, pickup_address: ride.pickup_address, drop_address: ride.drop_address } });
   }),
+
   getActiveRide: asyncHandler(async (req, res) => {
     const c = await Customer.findOne({ where: { user_id: req.userId } });
     if (!c) return success(res, null);
     const ride = await Ride.findOne({ where: { customer_id: c.id, status: { [Op.in]: ["searching","driver_assigned","driver_arrived","started"] } }, order: [["created_at","DESC"]] });
     return success(res, { ride });
   }),
+
   getRideHistory: asyncHandler(async (req, res) => {
     const p = parseInt(req.query.page) || 1; const l = parseInt(req.query.limit) || 20;
     let w = {};
@@ -69,11 +104,13 @@ module.exports = {
     const r = await Ride.findAndCountAll({ where: w, order: [["created_at","DESC"]], offset: (p-1)*l, limit: l });
     return paginated(res, r.rows, r.count, p, l);
   }),
+
   getRideDetails: asyncHandler(async (req, res) => {
     const ride = await Ride.findByPk(req.params.id);
     if (!ride) throw new ApiError(404, "Ride not found");
     return success(res, { ride });
   }),
+
   cancelRide: asyncHandler(async (req, res) => {
     const ride = await Ride.findByPk(req.params.id);
     if (!ride) throw new ApiError(404, "Ride not found");
@@ -81,6 +118,7 @@ module.exports = {
     ride.status = "cancelled"; ride.cancelled_by = "customer"; ride.cancelled_at = new Date(); await ride.save();
     return success(res, { ride });
   }),
+
   rateRide: asyncHandler(async (req, res) => {
     const ride = await Ride.findByPk(req.params.id);
     if (!ride) throw new ApiError(404, "Ride not found");

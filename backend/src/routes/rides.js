@@ -2,7 +2,6 @@
  * Ride Routes
  * Fare estimation, booking, tracking, history, cancellation, rating.
  */
-
 const router = require('express').Router();
 const rideController = require('../controllers/RideController');
 const { authenticate, authorize } = require('../middleware/auth');
@@ -74,17 +73,40 @@ router.post('/:id/cancel', rideController.cancelRide);
  */
 router.post('/:id/rate', rideController.rateRide);
 
-
-// Get available rides for drivers (searching status)
+// Get available rides for drivers within 2km
 router.get('/searching/available', authenticate, async (req, res) => {
   try {
-    const { Ride } = require('../models');
+    const { Ride, Driver } = require('../models');
+    const RideMatchingService = require('../services/RideMatchingService');
+
+    // Get driver's current location
+    const driver = await Driver.findOne({ where: { user_id: req.userId } });
+    if (!driver || !driver.current_latitude || !driver.current_longitude) {
+      return res.json({ success: true, data: [] });
+    }
+
+    // Get all searching rides
     const rides = await Ride.findAll({
       where: { status: 'searching', driver_id: null },
       order: [['created_at', 'DESC']],
-      limit: 10
+      limit: 20
     });
-    res.json({ success: true, data: rides });
+
+    // Filter rides within 2km of driver
+    const nearbyRides = [];
+    for (const ride of rides) {
+      const distance = RideMatchingService._calculateDistance(
+        parseFloat(driver.current_latitude),
+        parseFloat(driver.current_longitude),
+        parseFloat(ride.pickup_latitude),
+        parseFloat(ride.pickup_longitude)
+      );
+      if (distance <= 2) {
+        nearbyRides.push(ride);
+      }
+    }
+
+    res.json({ success: true, data: nearbyRides });
   } catch (e) {
     res.status(500).json({ success: false, error: { message: e.message } });
   }
@@ -116,10 +138,10 @@ router.post('/:id/accept', authenticate, async (req, res) => {
       changed_by_id: req.userId
     });
     
-    // Free driver for next ride
     res.json({ success: true, data: { ride }, message: 'Ride accepted' });
   } catch (e) {
     res.status(500).json({ success: false, error: { message: e.message } });
   }
 });
+
 module.exports = router;
