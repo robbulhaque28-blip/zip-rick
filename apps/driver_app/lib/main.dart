@@ -4,7 +4,7 @@ import "package:latlong2/latlong.dart";
 import "package:geolocator/geolocator.dart";
 import "package:http/http.dart" as http;
 import "dart:convert";
-import "dart:html" as html;
+import "dart:html" as html";
 
 void main() { WidgetsFlutterBinding.ensureInitialized(); runApp(const ZipRickDriverApp()); }
 
@@ -67,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
       const SizedBox(height: 40),
       TextField(controller: _phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "Phone", prefixIcon: Icon(Icons.phone_android), border: OutlineInputBorder())),
       if (_otpSent) ...[
-        const SizedBox(height: 16), TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: "Full Name", prefixIcon: Icon(Icons.person), border: OutlineInputBorder())),
+        const SizedBox(height: 16), TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: "Full Name (new users only)", prefixIcon: Icon(Icons.person), border: OutlineInputBorder())),
         const SizedBox(height: 16), TextField(controller: _otpCtrl, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: "OTP", prefixIcon: Icon(Icons.lock_outline), border: OutlineInputBorder())),
       ],
       if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error, style: const TextStyle(color: Colors.red))),
@@ -143,17 +143,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Future<void> _nativeLoc() async {
     try { if (await Geolocator.requestPermission() == LocationPermission.whileInUse) { final p = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high, timeLimit: const Duration(seconds: 10)); setState(() { _driverLocation = LatLng(p.latitude, p.longitude); _isLoading = false; }); _mapController.move(_driverLocation, 14); } else { setState(() => _isLoading = false); } } catch (_) { setState(() => _isLoading = false); }
   }
-
   void _startPolling() {
     Future.delayed(const Duration(seconds: 5), () {
       if (!mounted) return;
-      if (_isOnline) {
-        _checkForRideRequests();
-      }
+      if (_isOnline) { _checkForRideRequests(); }
       if (mounted) _startPolling();
     });
   }
-
   void _checkForRideRequests() async {
     try {
       final res = await http.get(Uri.parse(baseUrl + "/rides/searching/available"), headers: {"Authorization": "Bearer " + (_authToken ?? "")});
@@ -176,7 +172,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       }
     } catch (_) {}
   }
-
   void _acceptRide(Map<String, dynamic> ride) async {
     try {
       final res = await http.post(Uri.parse(baseUrl + "/rides/" + ride["id"] + "/accept"), headers: {"Authorization": "Bearer " + (_authToken ?? ""), "Content-Type": "application/json"});
@@ -190,16 +185,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       }
     } catch (_) {}
   }
-
-  void _rejectRide(Map<String, dynamic> ride) {
-    setState(() => _rideRequests.removeWhere((r) => r["id"] == ride["id"]));
-  }
-
-  void _completeRide() {
-    setState(() { _activeRide = null; _commissionDue += (_commissionDue + 10); });
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ride completed! Rs 10 commission added.")));
-  }
-
+  void _rejectRide(Map<String, dynamic> ride) { setState(() => _rideRequests.removeWhere((r) => r["id"] == ride["id"])); }
+  void _completeRide() { setState(() { _activeRide = null; _commissionDue += (_commissionDue + 10); }); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ride completed! Rs 10 commission added."))); }
   void _checkCommissionBeforeOnline() async {
     try { setState(() => _commissionLoading = true);
       final res = await http.get(Uri.parse(baseUrl + "/drivers/commission/due"), headers: {"Authorization": "Bearer " + (_authToken ?? "")});
@@ -225,7 +212,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       setState(() => _isOnline = true);
     } catch (_) { setState(() { _commissionLoading = false; _isOnline = true; }); }
   }
-
   void _showCommissionPayment() {
     showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (ctx) => Container(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
       const Text("Pay Commission", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), const SizedBox(height: 20),
@@ -244,7 +230,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       )),
     ])));
   }
-
   @override Widget build(BuildContext context) {
     final pages = [_home(), _earnings(), _profile()];
     return Scaffold(
@@ -253,7 +238,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         items: const [ BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"), BottomNavigationBarItem(icon: Icon(Icons.trending_up), label: "Earnings"), BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile") ]),
     );
   }
-
   Widget _home() => Scaffold(
     appBar: AppBar(title: const Text("Zip-Rick Driver")),
     body: _isLoading
@@ -266,11 +250,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             Positioned(bottom: 140, left: 0, right: 0, child: Center(child: GestureDetector(onTap: _showCommissionPayment, child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), decoration: BoxDecoration(color: Colors.red.withOpacity(0.9), borderRadius: BorderRadius.circular(20)), child: Text("Commission Due: Rs " + _commissionDue.toStringAsFixed(0), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)))))),
             Positioned(top: 16, left: 0, right: 0, child: Center(child: GestureDetector(
               onTap: () {
-                if (!_isOnline) {
-                  _checkCommissionBeforeOnline();
-                } else {
-                  setState(() => _isOnline = false);
-                }
+                if (!_isOnline) { _checkCommissionBeforeOnline(); }
+                else { setState(() => _isOnline = false); }
               },
               child: Container(width: 100, height: 100, decoration: BoxDecoration(shape: BoxShape.circle, color: _isOnline ? const Color(0xFF00D9A6) : Colors.white.withOpacity(0.9), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10)]),
                 child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -282,7 +263,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             Positioned(bottom: 80, left: 0, right: 0, child: Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), decoration: BoxDecoration(color: Colors.white.withOpacity(0.9), borderRadius: BorderRadius.circular(20)), child: Text(_isOnline ? "Waiting for rides..." : "Tap to go online", style: TextStyle(color: _isOnline ? Colors.green : Colors.grey, fontSize: 14))))),
           ]),
   );
-
   Widget _earnings() => Scaffold(
     appBar: AppBar(title: const Text("Earnings")),
     body: Padding(padding: const EdgeInsets.all(24), child: Column(children: [
@@ -304,7 +284,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       )),
     ])),
   );
-
   Widget _profile() => Scaffold(
     appBar: AppBar(title: const Text("Profile")),
     body: ListView(padding: const EdgeInsets.all(24), children: [

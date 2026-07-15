@@ -79,7 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
       const SizedBox(height: 40),
       TextField(controller: _phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "Phone", prefixIcon: Icon(Icons.phone_android), border: OutlineInputBorder())),
       if (_otpSent) ...[
-        const SizedBox(height: 16), TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: "Full Name", prefixIcon: Icon(Icons.person), border: OutlineInputBorder())),
+        const SizedBox(height: 16), TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: "Full Name (new users only)", prefixIcon: Icon(Icons.person), border: OutlineInputBorder())),
         const SizedBox(height: 16), TextField(controller: _otpCtrl, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: "OTP", prefixIcon: Icon(Icons.lock_outline), border: OutlineInputBorder())),
       ],
       if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error, style: const TextStyle(color: Colors.red))),
@@ -110,10 +110,8 @@ class _HomePageState extends State<HomePage> {
   LatLng _currentLocation = const LatLng(26.1445, 91.7362); LatLng? _pickupLocation; LatLng? _dropLocation;
   bool _loading = true; bool _isBooking = false; Map<String, dynamic>? _fareData;
   List<Map<String, dynamic>> _searchResults = []; bool _isSearching = false;
-
   @override void initState() { super.initState(); _getCurrentLocation(); }
   @override void dispose() { _pickupCtrl.dispose(); _dropCtrl.dispose(); super.dispose(); }
-
   Future<void> _getCurrentLocation() async {
     try {
       final js = html.window.navigator.geolocation;
@@ -126,7 +124,6 @@ class _HomePageState extends State<HomePage> {
       } else { _nativeLoc(); }
     } catch (_) { _nativeLoc(); }
   }
-
   Future<void> _nativeLoc() async {
     try {
       if (await Geolocator.requestPermission() == LocationPermission.whileInUse || await Geolocator.checkPermission() == LocationPermission.always) {
@@ -136,7 +133,6 @@ class _HomePageState extends State<HomePage> {
       } else { setState(() => _loading = false); }
     } catch (_) { setState(() => _loading = false); }
   }
-
   Future<void> _searchPlaces(String q, bool isPickup) async {
     if (q.length < 3) return;
     setState(() => _isSearching = true);
@@ -149,7 +145,6 @@ class _HomePageState extends State<HomePage> {
     } catch (_) {}
     setState(() => _isSearching = false);
   }
-
   void _selectPlace(Map<String, dynamic> p) {
     final ll = LatLng(p["lat"], p["lon"]);
     setState(() {
@@ -160,7 +155,6 @@ class _HomePageState extends State<HomePage> {
     _mapController.move(ll, 15);
     if (_pickupLocation != null && _dropLocation != null) _getFare();
   }
-
   Future<void> _getFare() async {
     if (_pickupLocation == null || _dropLocation == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Set pickup and drop first"))); return; }
     setState(() => _loading = true);
@@ -169,7 +163,6 @@ class _HomePageState extends State<HomePage> {
       if (r["success"]) { setState(() { _fareData = r["data"]; _loading = false; }); _showRideType(); }
     } catch (_) { setState(() => _loading = false); }
   }
-
   void _showRideType() {
     final base = (_fareData?["total_fare"] ?? 30).toInt();
     showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (ctx) => Container(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -181,7 +174,6 @@ class _HomePageState extends State<HomePage> {
       ]),
     ])));
   }
-
   void _showShareMode(int fare) {
     showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (ctx) => Container(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
       const Text("Ride Mode", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), const SizedBox(height: 20),
@@ -192,7 +184,6 @@ class _HomePageState extends State<HomePage> {
       ]),
     ])));
   }
-
   void _showPayment(int amount) {
     showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (ctx) => Container(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
       const Text("Payment", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), const SizedBox(height: 16),
@@ -205,9 +196,7 @@ class _HomePageState extends State<HomePage> {
       ]),
     ])));
   }
-
   Widget _typeBtn(String t, String p, Color c, VoidCallback on) => GestureDetector(onTap: on, child: Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: c, width: 2)), child: Column(children: [Text(t, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c)), const SizedBox(height: 4), Text(p, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: c))])));
-
   Future<void> _bookRide(String pm) async {
     if (_pickupLocation == null || _dropLocation == null) return;
     setState(() => _isBooking = true);
@@ -218,7 +207,6 @@ class _HomePageState extends State<HomePage> {
     } catch (_) {}
     setState(() => _isBooking = false);
   }
-
   @override Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text("Zip-Rick"), actions: [
       const Icon(Icons.card_giftcard), const SizedBox(width: 16),
@@ -290,24 +278,17 @@ class RideHistoryPage extends StatefulWidget {
   @override
   State<RideHistoryPage> createState() => _RideHistoryPageState();
 }
-
 class _RideHistoryPageState extends State<RideHistoryPage> {
   List _rides = [];
   bool _loading = true;
-
   @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
+  void initState() { super.initState(); _load(); }
   Future<void> _load() async {
     try {
       final r = await api.getRideHistory();
       if (r["success"]) setState(() { _rides = r["data"] ?? []; _loading = false; });
     } catch (_) { setState(() => _loading = false); }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
