@@ -111,12 +111,51 @@ module.exports = {
     return success(res, { ride });
   }),
 
-  cancelRide: asyncHandler(async (req, res) => {
+    cancelRide: asyncHandler(async (req, res) => {
     const ride = await Ride.findByPk(req.params.id);
     if (!ride) throw new ApiError(404, "Ride not found");
     if (!["pending","searching","driver_assigned"].includes(ride.status)) throw new ApiError(400, "Cannot cancel");
-    ride.status = "cancelled"; ride.cancelled_by = "customer"; ride.cancelled_at = new Date(); await ride.save();
-    return success(res, { ride });
+
+    ride.status = "cancelled";
+    ride.cancelled_by = "customer";
+    ride.cancelled_at = new Date();
+    ride.cancellation_reason = req.body.reason || "Cancelled by customer";
+
+    // Cancellation policy: Free within 2 min of creation. ₹10 after driver assigned.
+    const minutesSinceBooking = (new Date() - new Date(ride.created_at)) / 60000;
+    if (ride.status === "driver_assigned" || minutesSinceBooking > 2) {
+      ride.cancellation_charges = 10;
+    } else {
+      ride.cancellation_charges = 0;
+    }
+
+    await ride.save();
+
+    // Free up driver if assigned
+    if (ride.driver_id) {
+      await Driver.update(
+        { is_available: true, current_ride_id: null },
+        { where: { id: ride.driver_id } }
+      );
+    }
+
+    // Notify driver via socket if assigned
+    if (ride.driver_id) {
+      const { getIO } = require("../sockets");
+      const io = getIO();
+      if (io) {
+        const driver = await Driver.findByPk(ride.driver_id, { attributes: ['user_id'] });
+        if (driver) {
+          io.to(`user:${driver.user_id}`).emit('ride:cancelled', {
+            ride_id: ride.id,
+            ride_number: ride.ride_number,
+            reason: ride.cancellation_reason,
+          });
+        }
+      }
+    }
+
+    return success(res, { ride, cancellation_charges: ride.cancellation_charges, message: ride.cancellation_charges > 0 ? `Cancelled. ₹${ride.cancellation_charges} fee applied.` : "Cancelled. No fee." });
   }),
 
   rateRide: asyncHandler(async (req, res) => {
