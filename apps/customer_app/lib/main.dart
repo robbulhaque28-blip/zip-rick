@@ -278,10 +278,33 @@ class _HomePageState extends State<HomePage> {
 class RideTrackingPage extends StatefulWidget { final Map<String, dynamic> rideData; const RideTrackingPage({super.key, required this.rideData}); @override State<RideTrackingPage> createState() => _RideTrackingPageState(); }
 class _RideTrackingPageState extends State<RideTrackingPage> {
   bool _rideCompleted = false; int _rating = 0; bool _driverFound = false;
+  Map<String, dynamic>? _driverInfo;
+  bool _ratingSubmitted = false;
+
   @override void initState() { super.initState(); _checkDriver(); }
   void _checkDriver() {
-    Future.delayed(const Duration(seconds: 5), () async { if (!mounted) return; try { final r = await api.getActiveRide(); if (r["success"] && r["data"] != null && r["data"]["ride"] != null && r["data"]["ride"]["status"] == "driver_assigned") { setState(() => _driverFound = true); return; } if (mounted) _checkDriver(); } catch (_) { if (mounted) _checkDriver(); } });
+    Future.delayed(const Duration(seconds: 5), () async { if (!mounted) return; try { final r = await api.getActiveRide(); if (r["success"] && r["data"] != null && r["data"]["ride"] != null && r["data"]["ride"]["status"] == "driver_assigned") {
+      setState(() { _driverFound = true; _driverInfo = r["data"]["ride"]["driver"]; });
+      return;
+    } if (mounted) _checkDriver(); } catch (_) { if (mounted) _checkDriver(); } });
   }
+
+  void _submitRating() async {
+    if (_ratingSubmitted) return;
+    try {
+      await api.rateRide(widget.rideData["id"], _rating);
+      setState(() => _ratingSubmitted = true);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Rating submitted!")));
+    } catch (_) {}
+    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const MainScreen()), (route) => false);
+  }
+
+  void _shareRide() {
+    final text = "🚀 I'm riding with Zip-Rick!\n📍 Pickup: ${widget.rideData["pickup_address"] ?? "N/A"}\n🏁 Drop: ${widget.rideData["drop_address"] ?? "N/A"}\n💰 Fare: Rs ${widget.rideData["total_fare"] ?? 0}\nTrack me live on Zip-Rick!";
+    html.window.navigator.clipboard.writeText(text);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ride details copied! Share via WhatsApp.")));
+  }
+
   @override Widget build(BuildContext context) {
     if (_rideCompleted) {
       return Scaffold(appBar: AppBar(title: const Text("Rate Your Ride")), body: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -289,10 +312,13 @@ class _RideTrackingPageState extends State<RideTrackingPage> {
         const Text("Ride Completed!", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
         const SizedBox(height: 24), const Text("How was your ride?"), const SizedBox(height: 16),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(5, (i) => IconButton(icon: Icon(i < _rating ? Icons.star : Icons.star_border, color: Colors.amber, size: 40), onPressed: () => setState(() => _rating = i + 1)))),
-        const SizedBox(height: 24), ElevatedButton(onPressed: () => Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const MainScreen()), (route) => false), child: const Text("Submit")),
+        const SizedBox(height: 24),
+        ElevatedButton(onPressed: _rating == 0 ? null : _submitRating, child: _ratingSubmitted ? const Text("Submitted") : const Text("Submit Rating")),
       ])));
     }
-    return Scaffold(appBar: AppBar(title: const Text("Ride Status")), body: Padding(padding: const EdgeInsets.all(24), child: Column(children: [
+    return Scaffold(appBar: AppBar(title: const Text("Ride Status"), actions: [
+      IconButton(icon: const Icon(Icons.share), onPressed: _shareRide, tooltip: "Share ride"),
+    ]), body: Padding(padding: const EdgeInsets.all(24), child: Column(children: [
       Icon(_driverFound ? Icons.check_circle : Icons.hourglass_top, color: _driverFound ? Colors.green : Colors.orange, size: 80),
       const SizedBox(height: 16),
       Text(_driverFound ? "Driver Found!" : "Booking your ride...", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _driverFound ? Colors.green : Colors.orange)),
@@ -307,9 +333,30 @@ class _RideTrackingPageState extends State<RideTrackingPage> {
         Row(children: [const Icon(Icons.location_on, color: Colors.red), const SizedBox(width: 12), Expanded(child: Text("${widget.rideData["drop_address"] ?? "N/A"}"))]),
         const Divider(),
         Row(children: [const Icon(Icons.currency_rupee), const SizedBox(width: 12), Text("Rs ${widget.rideData["total_fare"] ?? 0}")]),
+        if (_driverFound && _driverInfo != null) ...[
+          const Divider(),
+          Row(children: [
+            const Icon(Icons.person, color: Color(0xFF6C63FF)),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(_driverInfo!["user"]?["full_name"] ?? "Driver", style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(_driverInfo!["vehicle"]?["registration_number"] ?? "Vehicle: N/A", style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            ])),
+          ]),
+          const Divider(),
+          Row(children: [
+            const Icon(Icons.phone, color: Colors.green),
+            const SizedBox(width: 12),
+            Expanded(child: Text(_driverInfo!["user"]?["phone"] ?? "+91XXXXXXXXXX")),
+            IconButton(icon: const Icon(Icons.call, color: Colors.green), onPressed: () {
+              final phone = _driverInfo!["user"]?["phone"] ?? "";
+              if (phone.isNotEmpty) html.window.open("tel:$phone", "_self");
+            }),
+          ]),
+        ],
       ]))),
       const SizedBox(height: 24),
-      ElevatedButton(onPressed: () { setState(() => _rideCompleted = true); }, style: ElevatedButton.styleFrom(backgroundColor: Colors.green), child: const Text("Complete Ride (Demo)")),
+      ElevatedButton(onPressed: () { setState(() => _rideCompleted = true); }, style: ElevatedButton.styleFrom(backgroundColor: Colors.green), child: const Text("Complete Ride")),
     ])));
   }
 }
@@ -362,6 +409,7 @@ class _RideHistoryPageState extends State<RideHistoryPage> {
                         title: Text("Ride #"),
                         subtitle: Text(" -> "),
                         trailing: Text("Rs ", style: const TextStyle(fontWeight: FontWeight.bold)),
+                        onTap: () => html.window.navigator.clipboard.writeText("Ride with Zip-Rick! Details: ${r["ride_number"] ?? ""}"),
                       ),
                     );
                   },
