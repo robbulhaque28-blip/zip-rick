@@ -281,4 +281,84 @@ router.get('/audit-logs', asyncHandler(async (req, res) => {
   return paginated(res, rows, count, p, l);
 }));
 
+// Admin Reports - Export CSV
+router.get('/reports/customers', asyncHandler(async (req, res) => {
+  const { Op } = require('sequelize');
+  const customers = await Customer.findAll({
+    include: [{ association: 'user', attributes: ['full_name', 'phone', 'email', 'created_at'] }],
+    order: [['created_at', 'DESC']],
+  });
+
+  let csv = 'Name,Phone,Email,Rides,Spent,Rating,Joined\n';
+  customers.forEach(c => {
+    csv += `"${c.user?.full_name || ''}","${c.user?.phone || ''}","${c.user?.email || ''}",${c.total_rides || 0},${c.total_spent || 0},${c.rating || 0},"${new Date(c.created_at).toLocaleDateString()}"\n`;
+  });
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=customers.csv');
+  res.send(csv);
+}));
+
+router.get('/reports/drivers', asyncHandler(async (req, res) => {
+  const drivers = await Driver.findAll({
+    include: [
+      { association: 'user', attributes: ['full_name', 'phone', 'email'] },
+      'vehicle',
+    ],
+    order: [['created_at', 'DESC']],
+  });
+
+  let csv = 'Name,Phone,Email,Status,Rides,Earnings,Vehicle,Joined\n';
+  drivers.forEach(d => {
+    csv += `"${d.user?.full_name || ''}","${d.user?.phone || ''}","${d.user?.email || ''}","${d.registration_status}",${d.total_rides || 0},${d.total_earnings || 0},"${d.vehicle?.registration_number || 'N/A'}","${new Date(d.created_at).toLocaleDateString()}"\n`;
+  });
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=drivers.csv');
+  res.send(csv);
+}));
+
+router.get('/reports/rides', asyncHandler(async (req, res) => {
+  const rides = await Ride.findAll({
+    include: [
+      { association: 'customer', include: [{ association: 'user', attributes: ['full_name'] }] },
+      { association: 'driver', include: [{ association: 'user', attributes: ['full_name'] }] },
+    ],
+    order: [['created_at', 'DESC']],
+    limit: 1000,
+  });
+
+  let csv = 'Ride #,Customer,Driver,Pickup,Drop,Status,Fare,Date\n';
+  rides.forEach(r => {
+    csv += `"${r.ride_number}","${r.customer?.user?.full_name || 'N/A'}","${r.driver?.user?.full_name || 'N/A'}","${(r.pickup_address || '').replace(/"/g,'""')}","${(r.drop_address || '').replace(/"/g,'""')}","${r.status}",${r.total_fare || 0},"${new Date(r.created_at).toLocaleDateString()}"\n`;
+  });
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=rides.csv');
+  res.send(csv);
+}));
+
+router.get('/reports/revenue', asyncHandler(async (req, res) => {
+  const days = parseInt(req.query.days) || 30;
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+
+  const payments = await Payment.findAll({
+    where: { created_at: { [Op.gte]: since } },
+    include: [
+      { association: 'ride', attributes: ['ride_number'] },
+    ],
+    order: [['created_at', 'DESC']],
+  });
+
+  let csv = 'Ride #,Amount,Method,Status,Date\n';
+  payments.forEach(p => {
+    csv += `"${p.ride?.ride_number || 'N/A'}",${p.amount || 0},${p.payment_method || 'N/A'},${p.payment_status || 'N/A'},"${new Date(p.created_at).toLocaleDateString()}"\n`;
+  });
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=revenue.csv');
+  res.send(csv);
+}));
+
 module.exports = router;
