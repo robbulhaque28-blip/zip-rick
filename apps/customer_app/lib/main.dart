@@ -24,6 +24,7 @@ class ZipRickApp extends StatelessWidget {
         case "/welcome": return MaterialPageRoute(builder: (_) => const WelcomeScreen());
         case "/login": return MaterialPageRoute(builder: (_) => const LoginScreen());
         case "/home": return MaterialPageRoute(builder: (_) => const MainScreen());
+        case "/refer": return MaterialPageRoute(builder: (_) => const ReferralPage());
         default: return MaterialPageRoute(builder: (_) => const SplashScreen());
       }
     },
@@ -362,7 +363,86 @@ class _ProfilePageState extends State<ProfilePage> { Map? _profile; bool _loadin
     Center(child: Text(_profile?["user"]?["phone"] ?? "", style: TextStyle(color: Colors.grey[600]))),
     const SizedBox(height: 32),
     Card(child: Column(children: [ListTile(leading: const Icon(Icons.star, color: Colors.amber), title: const Text("Rating"), trailing: Text("${_profile?["customer"]?["rating"] ?? "0.0"}")), const Divider(height: 1), ListTile(leading: const Icon(Icons.directions_car, color: Color(0xFF6C63FF)), title: const Text("Total Rides"), trailing: Text("${_profile?["customer"]?["total_rides"] ?? 0}"))])),
+    const SizedBox(height: 8),
+    Card(child: ListTile(
+      leading: const Icon(Icons.card_giftcard, color: Color(0xFF6C63FF)),
+      title: const Text("Refer & Earn"),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReferralPage())),
+    )),
   ]));
+}
+
+class ReferralPage extends StatefulWidget { const ReferralPage({super.key}); @override State<ReferralPage> createState() => _ReferralPageState(); }
+class _ReferralPageState extends State<ReferralPage> {
+  String? _code;
+  int _points = 0;
+  int _totalReferrals = 0;
+  bool _loading = true;
+  final _referCtrl = TextEditingController();
+  bool _applying = false;
+
+  @override void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    try {
+      final r = await api.getReferralStats();
+      if (r["success"]) {
+        setState(() { _code = r["data"]["referral_code"]; _points = r["data"]["loyalty_points"] ?? 0; _totalReferrals = r["data"]["total_referrals"] ?? 0; _loading = false; });
+      }
+    } catch (_) { setState(() => _loading = false); }
+  }
+
+  void _invite() async {
+    if (_code == null) return;
+    final text = "🚀 Join Zip-Rick! Use my referral code: $_code and get ₹50 bonus! Download at https://zip-rick-4.onrender.com";
+    await html.window.navigator.clipboard.writeText(text);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Referral code copied! Share it with friends.")));
+  }
+
+  Future<void> _applyCode() async {
+    if (_referCtrl.text.isEmpty) return;
+    setState(() => _applying = true);
+    try {
+      final r = await api.applyReferral(_referCtrl.text.trim());
+      if (r["success"]) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Referral applied! You earned 50 points!")));
+        _referCtrl.clear();
+        _load();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r["error"]?["message"] ?? "Failed")));
+      }
+    } catch (_) {}
+    setState(() => _applying = false);
+  }
+
+  @override Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text("Refer & Earn")),
+    body: _loading ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(24), children: [
+      Card(child: Padding(padding: const EdgeInsets.all(24), child: Column(children: [
+        const Icon(Icons.card_giftcard, size: 60, color: Color(0xFF6C63FF)),
+        const SizedBox(height: 12),
+        Text("Your Referral Code", style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+        const SizedBox(height: 8),
+        Text(_code ?? "", style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 2, color: Color(0xFF6C63FF))),
+        const SizedBox(height: 16),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+          Column(children: [Text("$_points", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)), const Text("Points", style: TextStyle(color: Colors.grey))]),
+          Column(children: [Text("$_totalReferrals", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)), const Text("Referred", style: TextStyle(color: Colors.grey))]),
+        ]),
+        const SizedBox(height: 20),
+        ElevatedButton.icon(onPressed: _invite, icon: const Icon(Icons.share), label: const Text("Invite Friends")),
+      ]))),
+      const Divider(height: 40),
+      const Text("Have a referral code?", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 12),
+      Row(children: [
+        Expanded(child: TextField(controller: _referCtrl, decoration: const InputDecoration(labelText: "Enter code", border: OutlineInputBorder()))),
+        const SizedBox(width: 12),
+        ElevatedButton(onPressed: _applying ? null : _applyCode, child: _applying ? const SizedBox(height:20,width:20,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)) : const Text("Apply")),
+      ]),
+    ]),
+  );
 }
 
 class SupportPage extends StatefulWidget { const SupportPage({super.key}); @override State<SupportPage> createState() => _SupportPageState(); }

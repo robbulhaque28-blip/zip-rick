@@ -72,4 +72,19 @@ class ApiService {
     final res = await http.post(Uri.parse(baseUrl + '/support/tickets'), headers: _headers(), body: jsonEncode({'subject': subject, 'description': description}));
     return jsonDecode(res.body);
   }
+
+  Future<Map<String, dynamic>> getReferralCode() async {
+    final res = await http.get(Uri.parse(baseUrl + '/referral/code'), headers: _headers());
+    return jsonDecode(res.body);
+  }
+
+  Future<Map<String, dynamic>> applyReferral(String code) async {
+    final res = await http.post(Uri.parse(baseUrl + '/referral/apply'), headers: _headers(), body: jsonEncode({'code': code}));
+    return jsonDecode(res.body);
+  }
+
+  Future<Map<String, dynamic>> getReferralStats() async {
+    final res = await http.get(Uri.parse(baseUrl + '/referral/stats'), headers: _headers());
+    return jsonDecode(res.body);
+  }
 }

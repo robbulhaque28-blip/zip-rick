@@ -123,5 +123,60 @@ router.post('/sos', authenticate, async (req, res) => {
     res.status(500).json({ success: false, error: { message: e.message } });
   }
 });
+// Referral system
+const { Referral, Customer, User } = require('../models');
 
+router.get('/referral/code', authenticate, async (req, res) => {
+  try {
+    const customer = await Customer.findOne({ where: { user_id: req.userId } });
+    if (!customer) return res.status(404).json({ success: false, error: { message: 'Customer not found' } });
+    res.json({ success: true, data: { referral_code: customer.referral_code, loyalty_points: customer.loyalty_points } });
+  } catch (e) {
+    res.status(500).json({ success: false, error: { message: e.message } });
+  }
+});
+
+router.post('/referral/apply', authenticate, async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ success: false, error: { message: 'Referral code required' } });
+
+    const referrer = await Customer.findOne({ where: { referral_code: code.toUpperCase() } });
+    if (!referrer) return res.status(404).json({ success: false, error: { message: 'Invalid referral code' } });
+
+    const customer = await Customer.findOne({ where: { user_id: req.userId } });
+    if (!customer) return res.status(404).json({ success: false, error: { message: 'Customer not found' } });
+    if (customer.referred_by) return res.status(400).json({ success: false, error: { message: 'Already referred' } });
+    if (referrer.id === customer.id) return res.status(400).json({ success: false, error: { message: 'Cannot refer yourself' } });
+
+    customer.referred_by = referrer.id;
+    customer.loyalty_points = (customer.loyalty_points || 0) + 50;
+    await customer.save();
+
+    referrer.loyalty_points = (referrer.loyalty_points || 0) + 100;
+    await referrer.save();
+
+    await Referral.create({
+      referrer_id: referrer.id,
+      referred_id: customer.id,
+      reward_amount: 100,
+      status: 'completed',
+    });
+
+    res.json({ success: true, message: 'Referral applied! You earned 50 points.', data: { loyalty_points: customer.loyalty_points } });
+  } catch (e) {
+    res.status(500).json({ success: false, error: { message: e.message } });
+  }
+});
+
+router.get('/referral/stats', authenticate, async (req, res) => {
+  try {
+    const customer = await Customer.findOne({ where: { user_id: req.userId } });
+    if (!customer) return res.status(404).json({ success: false, error: { message: 'Customer not found' } });
+    const count = await Referral.count({ where: { referrer_id: customer.id, status: 'completed' } });
+    res.json({ success: true, data: { referral_code: customer.referral_code, total_referrals: count, loyalty_points: customer.loyalty_points } });
+  } catch (e) {
+    res.status(500).json({ success: false, error: { message: e.message } });
+  }
+});
 module.exports = router;
