@@ -57,4 +57,19 @@ class ApiService {
     final res = await http.post(Uri.parse(baseUrl + '/rides/' + rideId + '/cancel'), headers: _headers());
     return jsonDecode(res.body);
   }
+
+  Future<Map<String, dynamic>> sos() async {
+    final res = await http.post(Uri.parse(baseUrl + '/sos'), headers: _headers());
+    return jsonDecode(res.body);
+  }
+
+  Future<Map<String, dynamic>> getSupportTickets() async {
+    final res = await http.get(Uri.parse(baseUrl + '/support/tickets'), headers: _headers());
+    return jsonDecode(res.body);
+  }
+
+  Future<Map<String, dynamic>> createSupportTicket(String subject, String description) async {
+    final res = await http.post(Uri.parse(baseUrl + '/support/tickets'), headers: _headers(), body: jsonEncode({'subject': subject, 'description': description}));
+    return jsonDecode(res.body);
+  }
 }

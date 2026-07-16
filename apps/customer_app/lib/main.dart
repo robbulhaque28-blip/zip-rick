@@ -112,6 +112,28 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _searchResults = []; bool _isSearching = false;
   @override void initState() { super.initState(); _getCurrentLocation(); }
   @override void dispose() { _pickupCtrl.dispose(); _dropCtrl.dispose(); super.dispose(); }
+
+  void _sosAlert() async {
+    showDialog(context: context, builder: (ctx) => AlertDialog(
+      title: const Text("🚨 SOS Emergency", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+      content: const Text("This will alert our support team immediately. Do you need help?"),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
+        ElevatedButton(onPressed: () async {
+          Navigator.pop(ctx);
+          try {
+            final r = await api.sos();
+            if (r["success"]) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("SOS sent! Help is on the way.")));
+            }
+          } catch (_) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to send SOS. Call emergency number.")));
+          }
+        }, style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text("Send SOS", style: TextStyle(color: Colors.white))),
+      ],
+    ));
+  }
+
   Future<void> _getCurrentLocation() async {
     try {
       final js = html.window.navigator.geolocation;
@@ -209,8 +231,9 @@ class _HomePageState extends State<HomePage> {
   }
   @override Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text("Zip-Rick"), actions: [
-      const Icon(Icons.card_giftcard), const SizedBox(width: 16),
-      const Icon(Icons.emergency, color: Colors.red),
+      IconButton(icon: const Icon(Icons.headset_mic), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportPage()))),
+      const SizedBox(width: 8),
+      IconButton(icon: const Icon(Icons.emergency, color: Colors.red), onPressed: _sosAlert),
     ]),
     body: Stack(children: [
       _loading ? const Center(child: CircularProgressIndicator()) : FlutterMap(mapController: _mapController, options: MapOptions(center: _currentLocation, zoom: 15, onLongPress: (tapPos, latlng) { setState(() { if (_dropLocation == null) { _dropLocation = latlng; _dropCtrl.text = "Pinned"; if (_pickupLocation != null) _getFare(); } else { _pickupLocation = latlng; _pickupCtrl.text = "Pinned"; _dropLocation = null; _dropCtrl.clear(); } }); }), children: [
@@ -340,4 +363,59 @@ class _ProfilePageState extends State<ProfilePage> { Map? _profile; bool _loadin
     const SizedBox(height: 32),
     Card(child: Column(children: [ListTile(leading: const Icon(Icons.star, color: Colors.amber), title: const Text("Rating"), trailing: Text("${_profile?["customer"]?["rating"] ?? "0.0"}")), const Divider(height: 1), ListTile(leading: const Icon(Icons.directions_car, color: Color(0xFF6C63FF)), title: const Text("Total Rides"), trailing: Text("${_profile?["customer"]?["total_rides"] ?? 0}"))])),
   ]));
+}
+
+class SupportPage extends StatefulWidget { const SupportPage({super.key}); @override State<SupportPage> createState() => _SupportPageState(); }
+class _SupportPageState extends State<SupportPage> {
+  final _subjectCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  bool _loading = false;
+  List _tickets = [];
+  bool _loadTickets = true;
+
+  @override void initState() { super.initState(); _fetchTickets(); }
+
+  Future<void> _fetchTickets() async {
+    try {
+      final r = await api.getSupportTickets();
+      if (r["success"]) setState(() { _tickets = r["data"] ?? []; _loadTickets = false; });
+    } catch (_) { setState(() => _loadTickets = false); }
+  }
+
+  Future<void> _createTicket() async {
+    if (_subjectCtrl.text.isEmpty || _descCtrl.text.isEmpty) return;
+    setState(() => _loading = true);
+    try {
+      final r = await api.createSupportTicket(_subjectCtrl.text, _descCtrl.text);
+      if (r["success"]) {
+        _subjectCtrl.clear(); _descCtrl.clear();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ticket created!")));
+        _fetchTickets();
+      }
+    } catch (_) {}
+    setState(() => _loading = false);
+  }
+
+  @override Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text("Support")),
+    body: _loadTickets ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(16), children: [
+      const Text("Create Ticket", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 12),
+      TextField(controller: _subjectCtrl, decoration: const InputDecoration(labelText: "Subject", border: OutlineInputBorder())),
+      const SizedBox(height: 8),
+      TextField(controller: _descCtrl, decoration: const InputDecoration(labelText: "Describe your issue", border: OutlineInputBorder()), maxLines: 3),
+      const SizedBox(height: 12),
+      ElevatedButton(onPressed: _loading ? null : _createTicket, child: _loading ? const SizedBox(height:20,width:20,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)) : const Text("Submit")),
+      const Divider(height: 32),
+      Text("My Tickets (${_tickets.length})", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      ..._tickets.isEmpty ? [const Padding(padding: EdgeInsets.all(24), child: Text("No tickets yet"))] : _tickets.map((t) => Card(
+        child: ListTile(
+          leading: Icon(t["priority"] == "urgent" ? Icons.warning : Icons.support_agent, color: t["priority"] == "urgent" ? Colors.red : Colors.blue),
+          title: Text(t["subject"] ?? "Support"),
+          subtitle: Text(t["status"] ?? "open"),
+          trailing: Text(t["priority"] ?? "medium", style: const TextStyle(fontSize: 12)),
+        ),
+      )),
+    ]),
+  );
 }
