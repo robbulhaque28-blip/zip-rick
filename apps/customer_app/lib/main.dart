@@ -301,7 +301,7 @@ class _RideTrackingPageState extends State<RideTrackingPage> {
 
   void _shareRide() {
     final text = "🚀 I'm riding with Zip-Rick!\n📍 Pickup: ${widget.rideData["pickup_address"] ?? "N/A"}\n🏁 Drop: ${widget.rideData["drop_address"] ?? "N/A"}\n💰 Fare: Rs ${widget.rideData["total_fare"] ?? 0}\nTrack me live on Zip-Rick!";
-    html.window.navigator.clipboard.writeText(text);
+    html.window.navigator.clipboard?.writeText(text);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ride details copied! Share via WhatsApp.")));
   }
 
@@ -409,7 +409,7 @@ class _RideHistoryPageState extends State<RideHistoryPage> {
                         title: Text("Ride #"),
                         subtitle: Text(" -> "),
                         trailing: Text("Rs ", style: const TextStyle(fontWeight: FontWeight.bold)),
-                        onTap: () => html.window.navigator.clipboard.writeText("Ride with Zip-Rick! Details: ${r["ride_number"] ?? ""}"),
+                        onTap: () => html.window.navigator.clipboard?.writeText("Ride with Zip-Rick! Details: ${r["ride_number"] ?? ""}"),
                       ),
                     );
                   },
@@ -459,7 +459,7 @@ class _ReferralPageState extends State<ReferralPage> {
   void _invite() async {
     if (_code == null) return;
     final text = "🚀 Join Zip-Rick! Use my referral code: $_code and get ₹50 bonus! Download at https://zip-rick-4.onrender.com";
-    await html.window.navigator.clipboard.writeText(text);
+    await html.window.navigator.clipboard?.writeText(text);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Referral code copied! Share it with friends.")));
   }
   Future<void> _applyCode() async {
