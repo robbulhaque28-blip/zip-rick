@@ -108,11 +108,15 @@ class HomePage extends StatefulWidget { const HomePage({super.key}); @override S
 class _HomePageState extends State<HomePage> {
   final MapController _mapController = MapController();
   final _pickupCtrl = TextEditingController(); final _dropCtrl = TextEditingController();
+  final _promoCtrl = TextEditingController();
   LatLng _currentLocation = const LatLng(26.1445, 91.7362); LatLng? _pickupLocation; LatLng? _dropLocation;
   bool _loading = true; bool _isBooking = false; Map<String, dynamic>? _fareData;
   List<Map<String, dynamic>> _searchResults = []; bool _isSearching = false;
+  String? _appliedPromo;
+  int _discount = 0;
+
   @override void initState() { super.initState(); _getCurrentLocation(); }
-  @override void dispose() { _pickupCtrl.dispose(); _dropCtrl.dispose(); super.dispose(); }
+  @override void dispose() { _pickupCtrl.dispose(); _dropCtrl.dispose(); _promoCtrl.dispose(); super.dispose(); }
 
   void _sosAlert() async {
     showDialog(context: context, builder: (ctx) => AlertDialog(
@@ -208,23 +212,36 @@ class _HomePageState extends State<HomePage> {
     ])));
   }
   void _showPayment(int amount) {
-    showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (ctx) => Container(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+    showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (ctx) => StatefulBuilder(builder: (ctx, setModalState) => Container(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
       const Text("Payment", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), const SizedBox(height: 16),
-      Text("Total: Rs $amount", style: const TextStyle(fontSize: 32, color: Color(0xFF6C63FF), fontWeight: FontWeight.bold)),
-      const SizedBox(height: 24),
+      Text("Total: Rs ${amount - _discount}", style: const TextStyle(fontSize: 32, color: Color(0xFF6C63FF), fontWeight: FontWeight.bold)),
+      if (_discount > 0) Text("Discount: -Rs $_discount", style: const TextStyle(color: Colors.green)),
+      const SizedBox(height: 12),
+      Row(children: [
+        Expanded(child: TextField(controller: _promoCtrl, decoration: const InputDecoration(labelText: "Promo code", border: OutlineInputBorder(), isDense: true))),
+        const SizedBox(width: 8),
+        TextButton(onPressed: () async {
+          if (_promoCtrl.text.isEmpty) return;
+          final code = _promoCtrl.text.trim().toUpperCase();
+          if (code == "ZIP50") { setModalState(() { _discount = (amount * 0.5).toInt(); _appliedPromo = code; }); }
+          else if (code == "ZIP20") { setModalState(() { _discount = 20; _appliedPromo = code; }); }
+          else { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Invalid code"))); }
+        }, child: const Text("Apply")),
+      ]),
+      const SizedBox(height: 16),
       Row(children: [
         Expanded(child: SizedBox(height: 50, child: ElevatedButton(onPressed: () { Navigator.pop(ctx); _bookRide("cash"); }, style: ElevatedButton.styleFrom(backgroundColor: Colors.teal), child: const Text("Cash")))),
         const SizedBox(width: 12),
         Expanded(child: SizedBox(height: 50, child: ElevatedButton(onPressed: () { Navigator.pop(ctx); _bookRide("upi"); }, child: const Text("UPI")))),
       ]),
-    ])));
+    ]))));
   }
   Widget _typeBtn(String t, String p, Color c, VoidCallback on) => GestureDetector(onTap: on, child: Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: c, width: 2)), child: Column(children: [Text(t, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c)), const SizedBox(height: 4), Text(p, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: c))])));
   Future<void> _bookRide(String pm) async {
     if (_pickupLocation == null || _dropLocation == null) return;
     setState(() => _isBooking = true);
     try {
-      final r = await api.bookRide(_pickupLocation!.latitude, _pickupLocation!.longitude, _pickupCtrl.text, _dropLocation!.latitude, _dropLocation!.longitude, _dropCtrl.text, pm, "");
+      final r = await api.bookRide(_pickupLocation!.latitude, _pickupLocation!.longitude, _pickupCtrl.text, _dropLocation!.latitude, _dropLocation!.longitude, _dropCtrl.text, pm, _appliedPromo ?? "");
       if (r["success"]) { if (!mounted) return; Navigator.push(context, MaterialPageRoute(builder: (_) => RideTrackingPage(rideData: r["data"]["ride"]))); }
       else { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r["error"]?["message"] ?? "Booking failed"))); }
     } catch (_) {}
@@ -383,7 +400,6 @@ class _ReferralPageState extends State<ReferralPage> {
   bool _applying = false;
 
   @override void initState() { super.initState(); _load(); }
-
   Future<void> _load() async {
     try {
       final r = await api.getReferralStats();
@@ -392,14 +408,12 @@ class _ReferralPageState extends State<ReferralPage> {
       }
     } catch (_) { setState(() => _loading = false); }
   }
-
   void _invite() async {
     if (_code == null) return;
     final text = "🚀 Join Zip-Rick! Use my referral code: $_code and get ₹50 bonus! Download at https://zip-rick-4.onrender.com";
     await html.window.navigator.clipboard.writeText(text);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Referral code copied! Share it with friends.")));
   }
-
   Future<void> _applyCode() async {
     if (_referCtrl.text.isEmpty) return;
     setState(() => _applying = true);
@@ -415,7 +429,6 @@ class _ReferralPageState extends State<ReferralPage> {
     } catch (_) {}
     setState(() => _applying = false);
   }
-
   @override Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text("Refer & Earn")),
     body: _loading ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(24), children: [
@@ -454,14 +467,12 @@ class _SupportPageState extends State<SupportPage> {
   bool _loadTickets = true;
 
   @override void initState() { super.initState(); _fetchTickets(); }
-
   Future<void> _fetchTickets() async {
     try {
       final r = await api.getSupportTickets();
       if (r["success"]) setState(() { _tickets = r["data"] ?? []; _loadTickets = false; });
     } catch (_) { setState(() => _loadTickets = false); }
   }
-
   Future<void> _createTicket() async {
     if (_subjectCtrl.text.isEmpty || _descCtrl.text.isEmpty) return;
     setState(() => _loading = true);
@@ -475,7 +486,6 @@ class _SupportPageState extends State<SupportPage> {
     } catch (_) {}
     setState(() => _loading = false);
   }
-
   @override Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text("Support")),
     body: _loadTickets ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(16), children: [
