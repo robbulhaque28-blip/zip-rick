@@ -4,7 +4,7 @@ import "package:latlong2/latlong.dart";
 import "package:geolocator/geolocator.dart";
 import "package:http/http.dart" as http;
 import "dart:convert";
-import "dart:html" as html";
+import "dart:html" as html;
 
 void main() { WidgetsFlutterBinding.ensureInitialized(); runApp(const ZipRickDriverApp()); }
 
@@ -21,6 +21,7 @@ class ZipRickDriverApp extends StatelessWidget { const ZipRickDriverApp({super.k
       case "/login": return MaterialPageRoute(builder: (_) => const LoginScreen());
       case "/register": return MaterialPageRoute(builder: (_) => const RegisterScreen());
       case "/home": return MaterialPageRoute(builder: (_) => const DriverHomeScreen());
+      case "/support": return MaterialPageRoute(builder: (_) => const SupportPage());
       default: return MaterialPageRoute(builder: (_) => const SplashScreen());
     }},
   );
@@ -134,6 +135,28 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Map<String, dynamic>? _activeRide;
   int _pollCount = 0;
 
+  void _sosAlert() async {
+    showDialog(context: context, builder: (ctx) => AlertDialog(
+      title: const Text("🚨 SOS Emergency", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+      content: const Text("This will alert our support team immediately. Do you need help?"),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
+        ElevatedButton(onPressed: () async {
+          Navigator.pop(ctx);
+          try {
+            final res = await http.post(Uri.parse(baseUrl + "/sos"), headers: {"Authorization": "Bearer " + (_authToken ?? "")});
+            final data = jsonDecode(res.body);
+            if (data["success"]) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("SOS sent! Help is on the way.")));
+            }
+          } catch (_) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to send SOS. Call emergency number.")));
+          }
+        }, style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text("Send SOS", style: TextStyle(color: Colors.white))),
+      ],
+    ));
+  }
+
   @override void initState() { super.initState(); _getLocation(); _startPolling(); }
   Future<void> _getLocation() async {
     try { final js = html.window.navigator.geolocation; if (js != null) {
@@ -239,7 +262,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
   Widget _home() => Scaffold(
-    appBar: AppBar(title: const Text("Zip-Rick Driver")),
+    appBar: AppBar(title: const Text("Zip-Rick Driver"), actions: [
+      IconButton(icon: const Icon(Icons.headset_mic), onPressed: () => Navigator.pushNamed(context, "/support")),
+      const SizedBox(width: 8),
+      IconButton(icon: const Icon(Icons.emergency, color: Colors.red), onPressed: _sosAlert),
+    ]),
     body: _isLoading
         ? const Center(child: CircularProgressIndicator())
         : Stack(children: [
@@ -291,6 +318,63 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       const Text("Driver", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
       const SizedBox(height: 32), Card(child: ListTile(leading: const Icon(Icons.star, color: Colors.amber), title: const Text("Rating"), trailing: const Text("0.0"))),
       Card(child: ListTile(leading: const Icon(Icons.document_scanner), title: const Text("My Documents"), trailing: const Icon(Icons.chevron_right))),
+    ]),
+  );
+}
+
+class SupportPage extends StatefulWidget { const SupportPage({super.key}); @override State<SupportPage> createState() => _SupportPageState(); }
+class _SupportPageState extends State<SupportPage> {
+  final _subjectCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  bool _loading = false;
+  List _tickets = [];
+  bool _loadTickets = true;
+
+  @override void initState() { super.initState(); _fetchTickets(); }
+
+  Future<void> _fetchTickets() async {
+    try {
+      final res = await http.get(Uri.parse(baseUrl + "/support/tickets"), headers: {"Authorization": "Bearer " + (_authToken ?? "")});
+      final data = jsonDecode(res.body);
+      if (data["success"]) setState(() { _tickets = data["data"] ?? []; _loadTickets = false; });
+    } catch (_) { setState(() => _loadTickets = false); }
+  }
+
+  Future<void> _createTicket() async {
+    if (_subjectCtrl.text.isEmpty || _descCtrl.text.isEmpty) return;
+    setState(() => _loading = true);
+    try {
+      final res = await http.post(Uri.parse(baseUrl + "/support/tickets"), headers: {"Authorization": "Bearer " + (_authToken ?? ""), "Content-Type": "application/json"}, body: jsonEncode({"subject": _subjectCtrl.text, "description": _descCtrl.text}));
+      final data = jsonDecode(res.body);
+      if (data["success"]) {
+        _subjectCtrl.clear(); _descCtrl.clear();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ticket created!")));
+        _fetchTickets();
+      }
+    } catch (_) {}
+    setState(() => _loading = false);
+  }
+
+  @override Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text("Support")),
+    body: _loadTickets ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(16), children: [
+      const Text("Create Ticket", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 12),
+      TextField(controller: _subjectCtrl, decoration: const InputDecoration(labelText: "Subject", border: OutlineInputBorder())),
+      const SizedBox(height: 8),
+      TextField(controller: _descCtrl, decoration: const InputDecoration(labelText: "Describe your issue", border: OutlineInputBorder()), maxLines: 3),
+      const SizedBox(height: 12),
+      ElevatedButton(onPressed: _loading ? null : _createTicket, child: _loading ? const SizedBox(height:20,width:20,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)) : const Text("Submit")),
+      const Divider(height: 32),
+      Text("My Tickets (${_tickets.length})", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      ..._tickets.isEmpty ? [const Padding(padding: EdgeInsets.all(24), child: Text("No tickets yet"))] : _tickets.map((t) => Card(
+        child: ListTile(
+          leading: Icon(t["priority"] == "urgent" ? Icons.warning : Icons.support_agent, color: t["priority"] == "urgent" ? Colors.red : Colors.blue),
+          title: Text(t["subject"] ?? "Support"),
+          subtitle: Text(t["status"] ?? "open"),
+          trailing: Text(t["priority"] ?? "medium", style: const TextStyle(fontSize: 12)),
+        ),
+      )),
     ]),
   );
 }
