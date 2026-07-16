@@ -179,4 +179,40 @@ router.get('/referral/stats', authenticate, async (req, res) => {
     res.status(500).json({ success: false, error: { message: e.message } });
   }
 });
+
+// Emergency Contacts
+router.get('/emergency-contacts', authenticate, async (req, res) => {
+  try {
+    const EmergencyContact = require('../models').EmergencyContact;
+    const contacts = await EmergencyContact.findAll({ where: { user_id: req.userId } });
+    res.json({ success: true, data: contacts });
+  } catch (e) {
+    res.status(500).json({ success: false, error: { message: e.message } });
+  }
+});
+
+router.post('/emergency-contacts', authenticate, async (req, res) => {
+  try {
+    const EmergencyContact = require('../models').EmergencyContact;
+    const contact = await EmergencyContact.create({
+      user_id: req.userId,
+      name: req.body.name,
+      phone: req.body.phone,
+      relation: req.body.relation || '',
+    });
+    res.json({ success: true, data: contact });
+  } catch (e) {
+    res.status(500).json({ success: false, error: { message: e.message } });
+  }
+});
+
+router.delete('/emergency-contacts/:id', authenticate, async (req, res) => {
+  try {
+    const EmergencyContact = require('../models').EmergencyContact;
+    await EmergencyContact.destroy({ where: { id: req.params.id, user_id: req.userId } });
+    res.json({ success: true, message: 'Deleted' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: { message: e.message } });
+  }
+});
 module.exports = router;
