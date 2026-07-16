@@ -1,13 +1,14 @@
 ﻿import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline, AppBar, Toolbar, Typography, Drawer, List, ListItem, ListItemIcon, ListItemText, Box, Button } from '@mui/material';
-import { Dashboard, PeopleAlt, DirectionsCar, Settings } from '@mui/icons-material';
+import { Dashboard, PeopleAlt, DirectionsCar, Settings, SupportAgent } from '@mui/icons-material';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import DriversPage from './pages/DriversPage';
 import CustomersPage from './pages/CustomersPage';
 import RidesPage from './pages/RidesPage';
 import SettingsPage from './pages/SettingsPage';
+import SupportPage from './pages/SupportPage';
 
 const theme = createTheme({
   palette: { primary: { main: '#6C63FF' }, secondary: { main: '#00D9A6' }, background: { default: '#F5F6FA' } },
@@ -20,15 +21,14 @@ function Layout() {
   const location = useLocation();
   const token = localStorage.getItem('admin_token');
   if (!token) return <Navigate to="/login" />;
-
   const menu = [
     { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard' },
     { text: 'Drivers', icon: <PeopleAlt />, path: '/drivers' },
     { text: 'Customers', icon: <PeopleAlt />, path: '/customers' },
     { text: 'Rides', icon: <DirectionsCar />, path: '/rides' },
+    { text: 'Support', icon: <SupportAgent />, path: '/support' },
     { text: 'Settings', icon: <Settings />, path: '/settings' },
   ];
-
   return (
     <Box sx={{ display: 'flex' }}>
       <AppBar position="fixed" sx={{ zIndex: 1201, backgroundColor: '#1A1D26' }}>
@@ -54,6 +54,7 @@ function Layout() {
           <Route path="/drivers" element={<DriversPage />} />
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/rides" element={<RidesPage />} />
+          <Route path="/support" element={<SupportPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/dashboard" />} />
         </Routes>
@@ -74,4 +75,5 @@ function App() {
     </ThemeProvider>
   );
 }
+
 export default App;
