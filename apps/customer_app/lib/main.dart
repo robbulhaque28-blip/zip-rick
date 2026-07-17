@@ -355,8 +355,20 @@ class _RideTrackingPageState extends State<RideTrackingPage> {
           ]),
         ],
       ]))),
-      const SizedBox(height: 24),
-      ElevatedButton(onPressed: () { setState(() => _rideCompleted = true); }, style: ElevatedButton.styleFrom(backgroundColor: Colors.green), child: const Text("Complete Ride")),
+      const SizedBox(height: 16),
+      Row(children: [
+        Expanded(child: ElevatedButton(onPressed: () async {
+          try {
+            final r = await api.cancelRide(widget.rideData["id"]);
+            if (r["success"]) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ride cancelled")));
+              Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const MainScreen()), (route) => false);
+            }
+          } catch (_) {}
+        }, style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text("Cancel Ride"))),
+        const SizedBox(width: 12),
+        Expanded(child: ElevatedButton(onPressed: () { setState(() => _rideCompleted = true); }, style: ElevatedButton.styleFrom(backgroundColor: Colors.green), child: const Text("Complete Ride"))),
+      ]),
     ])));
   }
 }
