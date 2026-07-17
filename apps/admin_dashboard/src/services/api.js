@@ -10,4 +10,16 @@ const api = axios.create({
   timeout: 30000,
 });
 
+// Auto-redirect to login on 401 (expired token)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('admin_token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;

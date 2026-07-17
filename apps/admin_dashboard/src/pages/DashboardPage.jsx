@@ -69,7 +69,7 @@ export default function DashboardPage() {
         <Card title="Total Customers" value={stats.total_customers || 0} color="#6C63FF" />
         <Card title="Total Drivers" value={stats.total_drivers || 0} color="#00D9A6" />
         <Card title="Active Rides" value={stats.active_rides || 0} color="#FFA726" />
-        <Card title="Revenue (Last {days} days)" value={"\u20B9" + ((stats.revenue?.total || 0)).toLocaleString()} color="#66BB6A" />
+        <Card title={`Revenue (Last ${days} days)`} value={"\u20B9" + ((stats.revenue?.total || 0)).toLocaleString()} color="#66BB6A" />
       </div>
       
       <div style={{ background: 'white', borderRadius: 10, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}>
