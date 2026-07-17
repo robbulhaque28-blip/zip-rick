@@ -310,7 +310,7 @@ router.get('/reports/drivers', asyncHandler(async (req, res) => {
 
   let csv = 'Name,Phone,Email,Status,Rides,Earnings,Vehicle,Joined\n';
   drivers.forEach(d => {
-    csv += `"${d.user?.full_name || ''}","${d.user?.phone || ''}","${d.user?.email || ''}","${d.registration_status}",${d.total_rides || 0},${d.total_earnings || 0},"${d.vehicle?.registration_number || 'N/A'}","${new Date(d.created_at).toLocaleDateString()}"\n`;
+    csv += `"${d.user?.full_name || ''}","${d.user?.phone || ''}","${d.user?.email || ''}","${d.registration_status}",${d.total_rides || 0},${d.total_earnings || 0},"${d.vehicle?.vehicle_number || 'N/A'}","${new Date(d.created_at).toLocaleDateString()}"\n`;
   });
 
   res.setHeader('Content-Type', 'text/csv');

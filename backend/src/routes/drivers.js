@@ -33,7 +33,7 @@ router.post("/documents", asyncHandler(async (req, res) => {
 router.post("/vehicle", asyncHandler(async (req, res) => {
   const driver = await Driver.findOne({ where: { user_id: req.userId } });
   const [v] = await Vehicle.findOrCreate({ where: { driver_id: driver.id }, defaults: { driver_id: driver.id, ...req.body } });
-  if (req.body.registration_number) Object.assign(v, req.body);
+  if (req.body.vehicle_number) Object.assign(v, req.body);
   await v.save();
   return success(res, { vehicle: v }, "Vehicle saved");
 }));
