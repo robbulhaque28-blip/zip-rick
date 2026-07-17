@@ -340,7 +340,7 @@ class _RideTrackingPageState extends State<RideTrackingPage> {
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(_driverInfo!["user"]?["full_name"] ?? "Driver", style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text(_driverInfo!["vehicle"]?["registration_number"] ?? "Vehicle: N/A", style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+              Text(_driverInfo!["vehicle"]?["vehicle_number"] ?? "Vehicle: N/A", style: TextStyle(fontSize: 12, color: Colors.grey[600])),
             ])),
           ]),
           const Divider(),
