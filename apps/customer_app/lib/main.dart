@@ -1,8 +1,9 @@
 ﻿import "package:flutter/material.dart";
+import "package:flutter/services.dart";
 import "package:flutter_map/flutter_map.dart";
 import "package:latlong2/latlong.dart";
 import "package:geolocator/geolocator.dart";
-import "dart:html" as html;
+import "package:url_launcher/url_launcher.dart";
 import "dart:convert";
 import "package:http/http.dart" as http;
 import "services/api_service.dart";
@@ -141,18 +142,6 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _getCurrentLocation() async {
     try {
-      final js = html.window.navigator.geolocation;
-      if (js != null) {
-        await js.getCurrentPosition().then((pos) {
-          final lat = pos.coords?.latitude ?? 0.0; final lng = pos.coords?.longitude ?? 0.0;
-          if (lat != 0 || lng != 0) { setState(() { _currentLocation = LatLng(lat.toDouble(), lng.toDouble()); _pickupLocation = _currentLocation; _pickupCtrl.text = "Current Location"; _loading = false; }); _mapController.move(_currentLocation, 15); return; }
-          _nativeLoc();
-        }).catchError((_) => _nativeLoc());
-      } else { _nativeLoc(); }
-    } catch (_) { _nativeLoc(); }
-  }
-  Future<void> _nativeLoc() async {
-    try {
       if (await Geolocator.requestPermission() == LocationPermission.whileInUse || await Geolocator.checkPermission() == LocationPermission.always) {
         final p = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high, timeLimit: const Duration(seconds: 10));
         setState(() { _currentLocation = LatLng(p.latitude, p.longitude); _pickupLocation = _currentLocation; _pickupCtrl.text = "Current Location"; _loading = false; });
@@ -160,11 +149,14 @@ class _HomePageState extends State<HomePage> {
       } else { setState(() => _loading = false); }
     } catch (_) { setState(() => _loading = false); }
   }
+
   Future<void> _searchPlaces(String q, bool isPickup) async {
     if (q.length < 3) return;
     setState(() => _isSearching = true);
     try {
-      final r = await http.get(Uri.parse("https://nominatim.openstreetmap.org/search?q=" + Uri.encodeComponent(q) + "&format=json&limit=5&countrycodes=in"), headers: {"User-Agent": "ZipRick/1.0"});
+      final lat = _currentLocation.latitude;
+final lon = _currentLocation.longitude;
+final r = await http.get(Uri.parse("https://nominatim.openstreetmap.org/search?q=" + Uri.encodeComponent(q) + "&format=json&limit=5&countrycodes=in&lat=" + lat.toString() + "&lon=" + lon.toString() + "&bounded=1&viewbox=" + (lon - 0.05).toString() + "," + (lat + 0.05).toString() + "," + (lon + 0.05).toString() + "," + (lat - 0.05).toString()), headers: {"User-Agent": "ZipRick/1.0"});
       if (r.statusCode == 200) {
         final List d = jsonDecode(r.body);
         setState(() { _searchResults = d.map((e) => {"display_name": e["display_name"] ?? "", "lat": double.parse(e["lat"] ?? "0"), "lon": double.parse(e["lon"] ?? "0"), "isPickup": isPickup}).toList(); });
@@ -301,7 +293,7 @@ class _RideTrackingPageState extends State<RideTrackingPage> {
 
   void _shareRide() {
     final text = "🚀 I'm riding with Zip-Rick!\n📍 Pickup: ${widget.rideData["pickup_address"] ?? "N/A"}\n🏁 Drop: ${widget.rideData["drop_address"] ?? "N/A"}\n💰 Fare: Rs ${widget.rideData["total_fare"] ?? 0}\nTrack me live on Zip-Rick!";
-    html.window.navigator.clipboard?.writeText(text);
+    Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ride details copied! Share via WhatsApp.")));
   }
 
@@ -348,9 +340,9 @@ class _RideTrackingPageState extends State<RideTrackingPage> {
             const Icon(Icons.phone, color: Colors.green),
             const SizedBox(width: 12),
             Expanded(child: Text(_driverInfo!["user"]?["phone"] ?? "+91XXXXXXXXXX")),
-            IconButton(icon: const Icon(Icons.call, color: Colors.green), onPressed: () {
+            IconButton(icon: const Icon(Icons.call, color: Colors.green), onPressed: () async {
               final phone = _driverInfo!["user"]?["phone"] ?? "";
-              if (phone.isNotEmpty) html.window.open("tel:$phone", "_self");
+              if (phone.isNotEmpty) await launchUrl(Uri.parse("tel:$phone"));
             }),
           ]),
         ],
@@ -419,7 +411,7 @@ class _RideHistoryPageState extends State<RideHistoryPage> {
                         title: Text("Ride #"),
                         subtitle: Text(" -> "),
                         trailing: Text("Rs ", style: const TextStyle(fontWeight: FontWeight.bold)),
-                        onTap: () => html.window.navigator.clipboard?.writeText("Ride with Zip-Rick! Details: ${r["ride_number"] ?? ""}"),
+                        onTap: () => Clipboard.setData(ClipboardData(text: "Ride with Zip-Rick! Details: ${r["ride_number"] ?? ""}")),
                       ),
                     );
                   },
@@ -468,8 +460,8 @@ class _ReferralPageState extends State<ReferralPage> {
   }
   void _invite() async {
     if (_code == null) return;
-    final text = "🚀 Join Zip-Rick! Use my referral code: $_code and get ₹50 bonus! Download at https://zip-rick-4.onrender.com";
-    await html.window.navigator.clipboard?.writeText(text);
+    final text = "🚀 Join Zip-Rick! Use my referral code: $_code and get ₹50 bonus! Download now!";
+    Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Referral code copied! Share it with friends.")));
   }
   Future<void> _applyCode() async {

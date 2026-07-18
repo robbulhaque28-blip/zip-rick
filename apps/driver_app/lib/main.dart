@@ -1,10 +1,10 @@
 ﻿import "package:flutter/material.dart";
+import "package:flutter/services.dart";
 import "package:flutter_map/flutter_map.dart";
 import "package:latlong2/latlong.dart";
 import "package:geolocator/geolocator.dart";
 import "package:http/http.dart" as http;
 import "dart:convert";
-import "dart:html" as html;
 
 void main() { WidgetsFlutterBinding.ensureInitialized(); runApp(const ZipRickDriverApp()); }
 
@@ -159,12 +159,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   @override void initState() { super.initState(); _getLocation(); _startPolling(); }
   Future<void> _getLocation() async {
-    try { final js = html.window.navigator.geolocation; if (js != null) {
-      await js.getCurrentPosition().then((pos) { final lat = pos.coords?.latitude ?? 0.0; final lng = pos.coords?.longitude ?? 0.0; if (lat != 0 || lng != 0) { setState(() { _driverLocation = LatLng(lat.toDouble(), lng.toDouble()); _isLoading = false; }); _mapController.move(_driverLocation, 14); return; } _nativeLoc(); }).catchError((_) => _nativeLoc());
-    } else { _nativeLoc(); } } catch (_) { _nativeLoc(); }
-  }
-  Future<void> _nativeLoc() async {
-    try { if (await Geolocator.requestPermission() == LocationPermission.whileInUse) { final p = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high, timeLimit: const Duration(seconds: 10)); setState(() { _driverLocation = LatLng(p.latitude, p.longitude); _isLoading = false; }); _mapController.move(_driverLocation, 14); } else { setState(() => _isLoading = false); } } catch (_) { setState(() => _isLoading = false); }
+    try {
+      if (await Geolocator.requestPermission() == LocationPermission.whileInUse || await Geolocator.checkPermission() == LocationPermission.always) {
+        final p = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high, timeLimit: const Duration(seconds: 10));
+        setState(() { _driverLocation = LatLng(p.latitude, p.longitude); _isLoading = false; });
+        _mapController.move(_driverLocation, 14);
+      } else { setState(() => _isLoading = false); }
+    } catch (_) { setState(() => _isLoading = false); }
   }
   void _startPolling() {
     Future.delayed(const Duration(seconds: 5), () {
@@ -288,6 +289,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
             ))),
             Positioned(bottom: 80, left: 0, right: 0, child: Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), decoration: BoxDecoration(color: Colors.white.withOpacity(0.9), borderRadius: BorderRadius.circular(20)), child: Text(_isOnline ? "Waiting for rides..." : "Tap to go online", style: TextStyle(color: _isOnline ? Colors.green : Colors.grey, fontSize: 14))))),
+            Positioned(right: 16, bottom: 16, child: FloatingActionButton(mini: true, onPressed: _getLocation, backgroundColor: Colors.white, child: const Icon(Icons.my_location, color: Color(0xFF6C63FF)))),
           ]),
   );
   Widget _earnings() => Scaffold(
@@ -311,14 +313,31 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       )),
     ])),
   );
-  Widget _profile() => Scaffold(
-    appBar: AppBar(title: const Text("Profile")),
-    body: ListView(padding: const EdgeInsets.all(24), children: [
-      const CircleAvatar(radius: 40, child: Icon(Icons.person, size: 40)), const SizedBox(height: 16),
-      const Text("Driver", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-      const SizedBox(height: 32), Card(child: ListTile(leading: const Icon(Icons.star, color: Colors.amber), title: const Text("Rating"), trailing: const Text("0.0"))),
-      Card(child: ListTile(leading: const Icon(Icons.document_scanner), title: const Text("My Documents"), trailing: const Icon(Icons.chevron_right))),
-    ]),
+  Widget _profile() => FutureBuilder(
+    future: http.get(Uri.parse(baseUrl + "/drivers/profile"), headers: {"Authorization": "Bearer " + (_authToken ?? "")}),
+    builder: (ctx, snap) {
+      String name = "Driver";
+      String phone = "";
+      if (snap.hasData) {
+        try {
+          final d = jsonDecode(snap.data!.body);
+          if (d["success"] && d["data"] != null && d["data"]["driver"] != null) {
+            name = d["data"]["driver"]["user"]?["full_name"] ?? "Driver";
+            phone = d["data"]["driver"]["user"]?["phone"] ?? "";
+          }
+        } catch (_) {}
+      }
+      return Scaffold(
+        appBar: AppBar(title: const Text("Profile")),
+        body: ListView(padding: const EdgeInsets.all(24), children: [
+          const CircleAvatar(radius: 40, child: Icon(Icons.person, size: 40)), const SizedBox(height: 16),
+          Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+          Text(phone, style: TextStyle(color: Colors.grey[600]), textAlign: TextAlign.center),
+          const SizedBox(height: 32), Card(child: ListTile(leading: const Icon(Icons.star, color: Colors.amber), title: const Text("Rating"), trailing: const Text("0.0"))),
+          Card(child: ListTile(leading: const Icon(Icons.document_scanner), title: const Text("My Documents"), trailing: const Icon(Icons.chevron_right))),
+        ]),
+      );
+    },
   );
 }
 
@@ -331,7 +350,6 @@ class _SupportPageState extends State<SupportPage> {
   bool _loadTickets = true;
 
   @override void initState() { super.initState(); _fetchTickets(); }
-
   Future<void> _fetchTickets() async {
     try {
       final res = await http.get(Uri.parse(baseUrl + "/support/tickets"), headers: {"Authorization": "Bearer " + (_authToken ?? "")});
@@ -339,7 +357,6 @@ class _SupportPageState extends State<SupportPage> {
       if (data["success"]) setState(() { _tickets = data["data"] ?? []; _loadTickets = false; });
     } catch (_) { setState(() => _loadTickets = false); }
   }
-
   Future<void> _createTicket() async {
     if (_subjectCtrl.text.isEmpty || _descCtrl.text.isEmpty) return;
     setState(() => _loading = true);
@@ -354,7 +371,6 @@ class _SupportPageState extends State<SupportPage> {
     } catch (_) {}
     setState(() => _loading = false);
   }
-
   @override Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text("Support")),
     body: _loadTickets ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(16), children: [
