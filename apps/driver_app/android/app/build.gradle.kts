@@ -17,7 +17,7 @@ android {
     defaultConfig {
         applicationId = "com.ziprick.zip_rick_driver"
         minSdk = flutter.minSdkVersion
-        targetSdk = 35
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

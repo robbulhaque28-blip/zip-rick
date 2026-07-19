@@ -24,6 +24,7 @@ class ZipRickApp extends StatelessWidget {
         case "/": return MaterialPageRoute(builder: (_) => const SplashScreen());
         case "/welcome": return MaterialPageRoute(builder: (_) => const WelcomeScreen());
         case "/login": return MaterialPageRoute(builder: (_) => const LoginScreen());
+        case "/register": return MaterialPageRoute(builder: (_) => const RegisterScreen());
         case "/home": return MaterialPageRoute(builder: (_) => const MainScreen());
         case "/refer": return MaterialPageRoute(builder: (_) => const ReferralPage());
         default: return MaterialPageRoute(builder: (_) => const SplashScreen());
@@ -43,7 +44,7 @@ class WelcomeScreen extends StatelessWidget {
       const Spacer(flex: 2),
       Padding(padding: const EdgeInsets.symmetric(horizontal: 32), child: SizedBox(width: double.infinity, height: 56, child: ElevatedButton(onPressed: () => Navigator.pushNamed(context, "/login"), style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Color(0xFF6C63FF), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: const Text("Login", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))))),
       const SizedBox(height: 16),
-      Padding(padding: const EdgeInsets.symmetric(horizontal: 32), child: SizedBox(width: double.infinity, height: 56, child: OutlinedButton(onPressed: () => Navigator.pushNamed(context, "/login"), style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white, width: 2), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: const Text("Register / New User", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))))),
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 32), child: SizedBox(width: double.infinity, height: 56, child: OutlinedButton(onPressed: () => Navigator.pushNamed(context, "/register"), style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white, width: 2), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: const Text("Register / New User", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))))),
       const Spacer(flex: 1),
     ]))),
   );
@@ -57,6 +58,49 @@ class _SplashScreenState extends State<SplashScreen> {
 
 class LoginScreen extends StatefulWidget { const LoginScreen({super.key}); @override State<LoginScreen> createState() => _LoginScreenState(); }
 class _LoginScreenState extends State<LoginScreen> {
+  final _phoneCtrl = TextEditingController(text: "+91"); final _otpCtrl = TextEditingController();
+  bool _otpSent = false; bool _loading = false; String _error = "";
+  @override void dispose() { _phoneCtrl.dispose(); _otpCtrl.dispose(); super.dispose(); }
+  Future<void> _sendOTP() async {
+    setState(() { _loading = true; _error = ""; });
+    try { final r = await api.sendOTP(_phoneCtrl.text); if (r["success"]) setState(() => _otpSent = true); else _error = r["error"]?["message"] ?? "Failed"; }
+    catch (e) { _error = "Cannot connect"; }
+    setState(() => _loading = false);
+  }
+  Future<void> _verifyOTP() async {
+    setState(() { _loading = true; _error = ""; });
+    try {
+      final r = await api.verifyOTP(_phoneCtrl.text, _otpCtrl.text, "", "customer");
+      if (r["success"]) { if (!mounted) return; Navigator.pushReplacementNamed(context, "/home"); }
+      else {
+        _error = r["error"]?["message"] ?? "Failed";
+        if (_error.contains("Name is required") || _error.contains("not found")) {
+          _error = "Account not found. Please go back and register.";
+        }
+      }
+    } catch (e) { _error = "Cannot connect"; }
+    setState(() => _loading = false);
+  }
+  @override Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const SizedBox(height: 60), const Icon(Icons.electric_rickshaw_rounded, size: 64, color: Color(0xFF6C63FF)),
+      const SizedBox(height: 24),
+      Text("Welcome Back", style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+      const SizedBox(height: 8), Text("Login to your account", style: const TextStyle(color: Color(0xFF6B7280), fontSize: 16)),
+      const SizedBox(height: 40),
+      TextField(controller: _phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "Phone", prefixIcon: Icon(Icons.phone_android), border: OutlineInputBorder())),
+      if (_otpSent) ...[
+        const SizedBox(height: 16), TextField(controller: _otpCtrl, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: "OTP", prefixIcon: Icon(Icons.lock_outline), border: OutlineInputBorder())),
+      ],
+      if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error, style: const TextStyle(color: Colors.red))),
+      const SizedBox(height: 24),
+      ElevatedButton(onPressed: _loading ? null : (_otpSent ? _verifyOTP : _sendOTP), child: _loading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Text(_otpSent ? "Verify OTP" : "Send OTP")),
+    ]))),
+  );
+}
+
+class RegisterScreen extends StatefulWidget { const RegisterScreen({super.key}); @override State<RegisterScreen> createState() => _RegisterScreenState(); }
+class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneCtrl = TextEditingController(text: "+91"); final _otpCtrl = TextEditingController(); final _nameCtrl = TextEditingController();
   bool _otpSent = false; bool _loading = false; String _error = "";
   @override void dispose() { _phoneCtrl.dispose(); _otpCtrl.dispose(); _nameCtrl.dispose(); super.dispose(); }
@@ -67,30 +111,35 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = false);
   }
   Future<void> _verifyOTP() async {
+    if (_nameCtrl.text.trim().isEmpty) { _error = "Name is required"; return; }
     setState(() { _loading = true; _error = ""; });
-    try { final r = await api.verifyOTP(_phoneCtrl.text, _otpCtrl.text, _nameCtrl.text, "customer"); if (r["success"]) { if (!mounted) return; Navigator.pushReplacementNamed(context, "/home"); } else _error = r["error"]?["message"] ?? "Failed"; }
-    catch (e) { _error = "Cannot connect"; }
+    try {
+      final r = await api.verifyOTP(_phoneCtrl.text, _otpCtrl.text, _nameCtrl.text, "customer");
+      if (r["success"]) { if (!mounted) return; Navigator.pushReplacementNamed(context, "/home"); }
+      else { _error = r["error"]?["message"] ?? "Failed"; }
+    } catch (e) { _error = "Cannot connect"; }
     setState(() => _loading = false);
   }
   @override Widget build(BuildContext context) => Scaffold(
     body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const SizedBox(height: 60), const Icon(Icons.electric_rickshaw_rounded, size: 64, color: Color(0xFF6C63FF)),
       const SizedBox(height: 24),
-      Text(_otpSent ? "Verify OTP" : "Welcome", style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-      const SizedBox(height: 8), Text(_otpSent ? "Enter OTP" : "Enter your phone", style: const TextStyle(color: Color(0xFF6B7280), fontSize: 16)),
+      Text("Create Account", style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+      const SizedBox(height: 8), Text("Register as a new customer", style: const TextStyle(color: Color(0xFF6B7280), fontSize: 16)),
       const SizedBox(height: 40),
       TextField(controller: _phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "Phone", prefixIcon: Icon(Icons.phone_android), border: OutlineInputBorder())),
       if (_otpSent) ...[
-        const SizedBox(height: 16), TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: "Full Name (new users only)", prefixIcon: Icon(Icons.person), border: OutlineInputBorder())),
+        const SizedBox(height: 16), TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: "Full Name", prefixIcon: Icon(Icons.person), border: OutlineInputBorder())),
         const SizedBox(height: 16), TextField(controller: _otpCtrl, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: "OTP", prefixIcon: Icon(Icons.lock_outline), border: OutlineInputBorder())),
       ],
       if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error, style: const TextStyle(color: Colors.red))),
       const SizedBox(height: 24),
-      ElevatedButton(onPressed: _loading ? null : (_otpSent ? _verifyOTP : _sendOTP), child: _loading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Text(_otpSent ? "Verify & Login" : "Send OTP")),
+      ElevatedButton(onPressed: _loading ? null : (_otpSent ? _verifyOTP : _sendOTP), child: _loading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Text(_otpSent ? "Create Account" : "Send OTP")),
     ]))),
   );
 }
 
+// Keep all the other classes exactly as they were (MainScreen, HomePage, etc.)
 class MainScreen extends StatefulWidget { const MainScreen({super.key}); @override State<MainScreen> createState() => _MainScreenState(); }
 class _MainScreenState extends State<MainScreen> {
   int _currentTab = 0;
@@ -155,8 +204,8 @@ class _HomePageState extends State<HomePage> {
     setState(() => _isSearching = true);
     try {
       final lat = _currentLocation.latitude;
-final lon = _currentLocation.longitude;
-final r = await http.get(Uri.parse("https://nominatim.openstreetmap.org/search?q=" + Uri.encodeComponent(q) + "&format=json&limit=5&countrycodes=in&lat=" + lat.toString() + "&lon=" + lon.toString() + "&bounded=1&viewbox=" + (lon - 0.05).toString() + "," + (lat + 0.05).toString() + "," + (lon + 0.05).toString() + "," + (lat - 0.05).toString()), headers: {"User-Agent": "ZipRick/1.0"});
+      final lon = _currentLocation.longitude;
+      final r = await http.get(Uri.parse("https://nominatim.openstreetmap.org/search?q=" + Uri.encodeComponent(q) + "&format=json&limit=5&countrycodes=in&lat=" + lat.toString() + "&lon=" + lon.toString() + "&bounded=1&viewbox=" + (lon - 0.05).toString() + "," + (lat + 0.05).toString() + "," + (lon + 0.05).toString() + "," + (lat - 0.05).toString()), headers: {"User-Agent": "ZipRick/1.0"});
       if (r.statusCode == 200) {
         final List d = jsonDecode(r.body);
         setState(() { _searchResults = d.map((e) => {"display_name": e["display_name"] ?? "", "lat": double.parse(e["lat"] ?? "0"), "lon": double.parse(e["lon"] ?? "0"), "isPickup": isPickup}).toList(); });
@@ -164,6 +213,7 @@ final r = await http.get(Uri.parse("https://nominatim.openstreetmap.org/search?q
     } catch (_) {}
     setState(() => _isSearching = false);
   }
+
   void _selectPlace(Map<String, dynamic> p) {
     final ll = LatLng(p["lat"], p["lon"]);
     setState(() {
@@ -174,6 +224,7 @@ final r = await http.get(Uri.parse("https://nominatim.openstreetmap.org/search?q
     _mapController.move(ll, 15);
     if (_pickupLocation != null && _dropLocation != null) _getFare();
   }
+
   Future<void> _getFare() async {
     if (_pickupLocation == null || _dropLocation == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Set pickup and drop first"))); return; }
     setState(() => _loading = true);
@@ -182,6 +233,7 @@ final r = await http.get(Uri.parse("https://nominatim.openstreetmap.org/search?q
       if (r["success"]) { setState(() { _fareData = r["data"]; _loading = false; }); _showRideType(); }
     } catch (_) { setState(() => _loading = false); }
   }
+
   void _showRideType() {
     final base = (_fareData?["total_fare"] ?? 30).toInt();
     showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (ctx) => Container(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -193,6 +245,7 @@ final r = await http.get(Uri.parse("https://nominatim.openstreetmap.org/search?q
       ]),
     ])));
   }
+
   void _showShareMode(int fare) {
     showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (ctx) => Container(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
       const Text("Ride Mode", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), const SizedBox(height: 20),
@@ -203,6 +256,7 @@ final r = await http.get(Uri.parse("https://nominatim.openstreetmap.org/search?q
       ]),
     ])));
   }
+
   void _showPayment(int amount) {
     showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (ctx) => StatefulBuilder(builder: (ctx, setModalState) => Container(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
       const Text("Payment", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), const SizedBox(height: 16),
@@ -228,7 +282,9 @@ final r = await http.get(Uri.parse("https://nominatim.openstreetmap.org/search?q
       ]),
     ]))));
   }
+
   Widget _typeBtn(String t, String p, Color c, VoidCallback on) => GestureDetector(onTap: on, child: Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: c, width: 2)), child: Column(children: [Text(t, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c)), const SizedBox(height: 4), Text(p, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: c))])));
+
   Future<void> _bookRide(String pm) async {
     if (_pickupLocation == null || _dropLocation == null) return;
     setState(() => _isBooking = true);
@@ -239,6 +295,7 @@ final r = await http.get(Uri.parse("https://nominatim.openstreetmap.org/search?q
     } catch (_) {}
     setState(() => _isBooking = false);
   }
+
   @override Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text("Zip-Rick"), actions: [
       IconButton(icon: const Icon(Icons.headset_mic), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportPage()))),
@@ -270,33 +327,15 @@ final r = await http.get(Uri.parse("https://nominatim.openstreetmap.org/search?q
 class RideTrackingPage extends StatefulWidget { final Map<String, dynamic> rideData; const RideTrackingPage({super.key, required this.rideData}); @override State<RideTrackingPage> createState() => _RideTrackingPageState(); }
 class _RideTrackingPageState extends State<RideTrackingPage> {
   bool _rideCompleted = false; int _rating = 0; bool _driverFound = false;
-  Map<String, dynamic>? _driverInfo;
-  bool _ratingSubmitted = false;
-
+  Map<String, dynamic>? _driverInfo; bool _ratingSubmitted = false;
   @override void initState() { super.initState(); _checkDriver(); }
   void _checkDriver() {
     Future.delayed(const Duration(seconds: 5), () async { if (!mounted) return; try { final r = await api.getActiveRide(); if (r["success"] && r["data"] != null && r["data"]["ride"] != null && r["data"]["ride"]["status"] == "driver_assigned") {
-      setState(() { _driverFound = true; _driverInfo = r["data"]["ride"]["driver"]; });
-      return;
+      setState(() { _driverFound = true; _driverInfo = r["data"]["ride"]["driver"]; }); return;
     } if (mounted) _checkDriver(); } catch (_) { if (mounted) _checkDriver(); } });
   }
-
-  void _submitRating() async {
-    if (_ratingSubmitted) return;
-    try {
-      await api.rateRide(widget.rideData["id"], _rating);
-      setState(() => _ratingSubmitted = true);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Rating submitted!")));
-    } catch (_) {}
-    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const MainScreen()), (route) => false);
-  }
-
-  void _shareRide() {
-    final text = "🚀 I'm riding with Zip-Rick!\n📍 Pickup: ${widget.rideData["pickup_address"] ?? "N/A"}\n🏁 Drop: ${widget.rideData["drop_address"] ?? "N/A"}\n💰 Fare: Rs ${widget.rideData["total_fare"] ?? 0}\nTrack me live on Zip-Rick!";
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ride details copied! Share via WhatsApp.")));
-  }
-
+  void _submitRating() async { if (_ratingSubmitted) return; try { await api.rateRide(widget.rideData["id"], _rating); setState(() => _ratingSubmitted = true); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Rating submitted!"))); } catch (_) {} Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const MainScreen()), (route) => false); }
+  void _shareRide() { final text = "🚀 I'm riding with Zip-Rick!\n📍 ${widget.rideData["pickup_address"] ?? "N/A"}\n🏁 ${widget.rideData["drop_address"] ?? "N/A"}\n💰 Rs ${widget.rideData["total_fare"] ?? 0}"; Clipboard.setData(ClipboardData(text: text)); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Copied!"))); }
   @override Widget build(BuildContext context) {
     if (_rideCompleted) {
       return Scaffold(appBar: AppBar(title: const Text("Rate Your Ride")), body: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -308,116 +347,45 @@ class _RideTrackingPageState extends State<RideTrackingPage> {
         ElevatedButton(onPressed: _rating == 0 ? null : _submitRating, child: _ratingSubmitted ? const Text("Submitted") : const Text("Submit Rating")),
       ])));
     }
-    return Scaffold(appBar: AppBar(title: const Text("Ride Status"), actions: [
-      IconButton(icon: const Icon(Icons.share), onPressed: _shareRide, tooltip: "Share ride"),
-    ]), body: Padding(padding: const EdgeInsets.all(24), child: Column(children: [
-      Icon(_driverFound ? Icons.check_circle : Icons.hourglass_top, color: _driverFound ? Colors.green : Colors.orange, size: 80),
-      const SizedBox(height: 16),
-      Text(_driverFound ? "Driver Found!" : "Booking your ride...", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _driverFound ? Colors.green : Colors.orange)),
-      const SizedBox(height: 8),
-      Text("Ride #${widget.rideData["ride_number"] ?? "N/A"}", style: TextStyle(color: Colors.grey[600])),
-      const SizedBox(height: 24),
-      if (_driverFound) const LinearProgressIndicator() else const CircularProgressIndicator(),
-      const SizedBox(height: 24),
-      Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(children: [
-        Row(children: [const Icon(Icons.location_on, color: Colors.green), const SizedBox(width: 12), Expanded(child: Text("${widget.rideData["pickup_address"] ?? "N/A"}"))]),
-        const Divider(),
-        Row(children: [const Icon(Icons.location_on, color: Colors.red), const SizedBox(width: 12), Expanded(child: Text("${widget.rideData["drop_address"] ?? "N/A"}"))]),
-        const Divider(),
-        Row(children: [const Icon(Icons.currency_rupee), const SizedBox(width: 12), Text("Rs ${widget.rideData["total_fare"] ?? 0}")]),
-        if (_driverFound && _driverInfo != null) ...[
+    return Scaffold(appBar: AppBar(title: const Text("Ride Status"), actions: [IconButton(icon: const Icon(Icons.share), onPressed: _shareRide)]),
+      body: Padding(padding: const EdgeInsets.all(24), child: Column(children: [
+        Icon(_driverFound ? Icons.check_circle : Icons.hourglass_top, color: _driverFound ? Colors.green : Colors.orange, size: 80),
+        const SizedBox(height: 16),
+        Text(_driverFound ? "Driver Found!" : "Booking...", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _driverFound ? Colors.green : Colors.orange)),
+        const SizedBox(height: 8),
+        Text("Ride #${widget.rideData["ride_number"] ?? "N/A"}", style: TextStyle(color: Colors.grey[600])),
+        const SizedBox(height: 24),
+        if (_driverFound) const LinearProgressIndicator() else const CircularProgressIndicator(),
+        const SizedBox(height: 24),
+        Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(children: [
+          Row(children: [const Icon(Icons.location_on, color: Colors.green), const SizedBox(width: 12), Expanded(child: Text("${widget.rideData["pickup_address"] ?? "N/A"}"))]),
           const Divider(),
-          Row(children: [
-            const Icon(Icons.person, color: Color(0xFF6C63FF)),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(_driverInfo!["user"]?["full_name"] ?? "Driver", style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text(_driverInfo!["vehicle"]?["vehicle_number"] ?? "Vehicle: N/A", style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-            ])),
-          ]),
+          Row(children: [const Icon(Icons.location_on, color: Colors.red), const SizedBox(width: 12), Expanded(child: Text("${widget.rideData["drop_address"] ?? "N/A"}"))]),
           const Divider(),
-          Row(children: [
-            const Icon(Icons.phone, color: Colors.green),
-            const SizedBox(width: 12),
-            Expanded(child: Text(_driverInfo!["user"]?["phone"] ?? "+91XXXXXXXXXX")),
-            IconButton(icon: const Icon(Icons.call, color: Colors.green), onPressed: () async {
-              final phone = _driverInfo!["user"]?["phone"] ?? "";
-              if (phone.isNotEmpty) await launchUrl(Uri.parse("tel:$phone"));
-            }),
-          ]),
-        ],
-      ]))),
-      const SizedBox(height: 16),
-      _driverFound
-          ? SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () { setState(() => _rideCompleted = true); }, style: ElevatedButton.styleFrom(backgroundColor: Colors.green), child: const Text("Complete Ride")))
-          : SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () async {
-              try {
-                final r = await api.cancelRide(widget.rideData["id"]);
-                if (r["success"]) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ride cancelled")));
-                  Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const MainScreen()), (route) => false);
-                }
-              } catch (_) {}
-            }, style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text("Cancel Ride"))),
-    ])));
+          Row(children: [const Icon(Icons.currency_rupee), const SizedBox(width: 12), Text("Rs ${widget.rideData["total_fare"] ?? 0}")]),
+          if (_driverFound && _driverInfo != null) ...[
+            const Divider(), Row(children: [const Icon(Icons.person, color: Color(0xFF6C63FF)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(_driverInfo!["user"]?["full_name"] ?? "Driver", style: const TextStyle(fontWeight: FontWeight.bold)), Text(_driverInfo!["vehicle"]?["vehicle_number"] ?? "N/A", style: TextStyle(fontSize: 12, color: Colors.grey[600]))]))]),
+            const Divider(), Row(children: [const Icon(Icons.phone, color: Colors.green), const SizedBox(width: 12), Expanded(child: Text(_driverInfo!["user"]?["phone"] ?? "+91XXXXXXXXXX")), IconButton(icon: const Icon(Icons.call, color: Colors.green), onPressed: () async { final phone = _driverInfo!["user"]?["phone"] ?? ""; if (phone.isNotEmpty) await launchUrl(Uri.parse("tel:$phone")); })]),
+          ],
+        ]))),
+        const SizedBox(height: 16),
+        _driverFound ? SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () { setState(() => _rideCompleted = true); }, style: ElevatedButton.styleFrom(backgroundColor: Colors.green), child: const Text("Complete Ride")))
+          : SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () async { try { final r = await api.cancelRide(widget.rideData["id"]); if (r["success"]) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ride cancelled"))); Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const MainScreen()), (route) => false); } } catch (_) {} }, style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text("Cancel Ride"))),
+      ])));
   }
 }
 
-class RideHistoryPage extends StatefulWidget {
-  const RideHistoryPage({super.key});
-  @override
-  State<RideHistoryPage> createState() => _RideHistoryPageState();
-}
-class _RideHistoryPageState extends State<RideHistoryPage> {
-  List _rides = [];
-  bool _loading = true;
-  @override
-  void initState() { super.initState(); _load(); }
-  Future<void> _load() async {
-    try {
-      final r = await api.getRideHistory();
-      if (r["success"]) setState(() { _rides = r["data"] ?? []; _loading = false; });
-    } catch (_) { setState(() => _loading = false); }
-  }
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("My Rides")),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _rides.isEmpty
-              ? const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.directions_car, size: 60, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text("No rides yet"),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: _rides.length,
-                  itemBuilder: (ctx, i) {
-                    final r = _rides[i];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: Icon(
-                          r["status"] == "completed" ? Icons.check_circle : Icons.pending,
-                          color: r["status"] == "completed" ? Colors.green : Colors.orange,
-                        ),
-                        title: Text("Ride #"),
-                        subtitle: Text(" -> "),
-                        trailing: Text("Rs ", style: const TextStyle(fontWeight: FontWeight.bold)),
-                        onTap: () => Clipboard.setData(ClipboardData(text: "Ride with Zip-Rick! Details: ${r["ride_number"] ?? ""}")),
-                      ),
-                    );
-                  },
-                ),
-    );
-  }
+class RideHistoryPage extends StatefulWidget { const RideHistoryPage({super.key}); @override State<RideHistoryPage> createState() => _RideHistoryPageState(); }
+class _RideHistoryPageState extends State<RideHistoryPage> { List _rides = []; bool _loading = true;
+  @override void initState() { super.initState(); _load(); }
+  Future<void> _load() async { try { final r = await api.getRideHistory(); if (r["success"]) setState(() { _rides = r["data"] ?? []; _loading = false; }); } catch (_) { setState(() => _loading = false); } }
+  @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text("My Rides")), body: _loading ? const Center(child: CircularProgressIndicator()) : _rides.isEmpty
+    ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.directions_car, size: 60, color: Colors.grey), SizedBox(height: 16), Text("No rides yet")]))
+    : ListView.builder(padding: const EdgeInsets.all(12), itemCount: _rides.length, itemBuilder: (ctx, i) { final r = _rides[i]; return Card(margin: const EdgeInsets.only(bottom: 8), child: ListTile(
+      leading: Icon(r["status"] == "completed" ? Icons.check_circle : Icons.pending, color: r["status"] == "completed" ? Colors.green : Colors.orange),
+      title: Text("Ride #"), subtitle: Text(" -> "), trailing: Text("Rs ", style: const TextStyle(fontWeight: FontWeight.bold)),
+      onTap: () => Clipboard.setData(ClipboardData(text: "Ride with Zip-Rick! Details: ${r["ride_number"] ?? ""}")),
+    )); }));
 }
 
 class ProfilePage extends StatefulWidget { const ProfilePage({super.key}); @override State<ProfilePage> createState() => _ProfilePageState(); }
@@ -428,134 +396,34 @@ class _ProfilePageState extends State<ProfilePage> { Map? _profile; bool _loadin
     const CircleAvatar(radius: 40, child: Icon(Icons.person, size: 40)), const SizedBox(height: 16),
     Center(child: Text(_profile?["user"]?["full_name"] ?? "User", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
     Center(child: Text(_profile?["user"]?["phone"] ?? "", style: TextStyle(color: Colors.grey[600]))),
-    const SizedBox(height: 32),
-    Card(child: Column(children: [ListTile(leading: const Icon(Icons.star, color: Colors.amber), title: const Text("Rating"), trailing: Text("${_profile?["customer"]?["rating"] ?? "0.0"}")), const Divider(height: 1), ListTile(leading: const Icon(Icons.directions_car, color: Color(0xFF6C63FF)), title: const Text("Total Rides"), trailing: Text("${_profile?["customer"]?["total_rides"] ?? 0}"))])),
-    const SizedBox(height: 8),
-    Card(child: ListTile(
-      leading: const Icon(Icons.card_giftcard, color: Color(0xFF6C63FF)),
-      title: const Text("Refer & Earn"),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReferralPage())),
-    )),
+    const SizedBox(height: 32), Card(child: Column(children: [ListTile(leading: const Icon(Icons.star, color: Colors.amber), title: const Text("Rating"), trailing: Text("${_profile?["customer"]?["rating"] ?? "0.0"}")), const Divider(height: 1), ListTile(leading: const Icon(Icons.directions_car, color: Color(0xFF6C63FF)), title: const Text("Total Rides"), trailing: Text("${_profile?["customer"]?["total_rides"] ?? 0}"))])),
+    const SizedBox(height: 8), Card(child: ListTile(leading: const Icon(Icons.card_giftcard, color: Color(0xFF6C63FF)), title: const Text("Refer & Earn"), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReferralPage())))),
   ]));
 }
 
 class ReferralPage extends StatefulWidget { const ReferralPage({super.key}); @override State<ReferralPage> createState() => _ReferralPageState(); }
-class _ReferralPageState extends State<ReferralPage> {
-  String? _code;
-  int _points = 0;
-  int _totalReferrals = 0;
-  bool _loading = true;
-  final _referCtrl = TextEditingController();
-  bool _applying = false;
-
+class _ReferralPageState extends State<ReferralPage> { String? _code; int _points = 0; int _totalReferrals = 0; bool _loading = true; final _referCtrl = TextEditingController(); bool _applying = false;
   @override void initState() { super.initState(); _load(); }
-  Future<void> _load() async {
-    try {
-      final r = await api.getReferralStats();
-      if (r["success"]) {
-        setState(() { _code = r["data"]["referral_code"]; _points = r["data"]["loyalty_points"] ?? 0; _totalReferrals = r["data"]["total_referrals"] ?? 0; _loading = false; });
-      }
-    } catch (_) { setState(() => _loading = false); }
-  }
-  void _invite() async {
-    if (_code == null) return;
-    final text = "🚀 Join Zip-Rick! Use my referral code: $_code and get ₹50 bonus! Download now!";
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Referral code copied! Share it with friends.")));
-  }
-  Future<void> _applyCode() async {
-    if (_referCtrl.text.isEmpty) return;
-    setState(() => _applying = true);
-    try {
-      final r = await api.applyReferral(_referCtrl.text.trim());
-      if (r["success"]) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Referral applied! You earned 50 points!")));
-        _referCtrl.clear();
-        _load();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r["error"]?["message"] ?? "Failed")));
-      }
-    } catch (_) {}
-    setState(() => _applying = false);
-  }
-  @override Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text("Refer & Earn")),
-    body: _loading ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(24), children: [
-      Card(child: Padding(padding: const EdgeInsets.all(24), child: Column(children: [
-        const Icon(Icons.card_giftcard, size: 60, color: Color(0xFF6C63FF)),
-        const SizedBox(height: 12),
-        Text("Your Referral Code", style: TextStyle(fontSize: 14, color: Colors.grey[600])),
-        const SizedBox(height: 8),
-        Text(_code ?? "", style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 2, color: Color(0xFF6C63FF))),
-        const SizedBox(height: 16),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-          Column(children: [Text("$_points", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)), const Text("Points", style: TextStyle(color: Colors.grey))]),
-          Column(children: [Text("$_totalReferrals", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)), const Text("Referred", style: TextStyle(color: Colors.grey))]),
-        ]),
-        const SizedBox(height: 20),
-        ElevatedButton.icon(onPressed: _invite, icon: const Icon(Icons.share), label: const Text("Invite Friends")),
-      ]))),
-      const Divider(height: 40),
-      const Text("Have a referral code?", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 12),
-      Row(children: [
-        Expanded(child: TextField(controller: _referCtrl, decoration: const InputDecoration(labelText: "Enter code", border: OutlineInputBorder()))),
-        const SizedBox(width: 12),
-        ElevatedButton(onPressed: _applying ? null : _applyCode, child: _applying ? const SizedBox(height:20,width:20,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)) : const Text("Apply")),
-      ]),
-    ]),
-  );
+  Future<void> _load() async { try { final r = await api.getReferralStats(); if (r["success"]) { setState(() { _code = r["data"]["referral_code"]; _points = r["data"]["loyalty_points"] ?? 0; _totalReferrals = r["data"]["total_referrals"] ?? 0; _loading = false; }); } } catch (_) { setState(() => _loading = false); } }
+  void _invite() async { if (_code == null) return; final text = "🚀 Join Zip-Rick! Use my code: $_code and get ₹50 bonus!"; Clipboard.setData(ClipboardData(text: text)); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Copied!"))); }
+  Future<void> _applyCode() async { if (_referCtrl.text.isEmpty) return; setState(() => _applying = true); try { final r = await api.applyReferral(_referCtrl.text.trim()); if (r["success"]) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Referral applied!"))); _referCtrl.clear(); _load(); } else { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r["error"]?["message"] ?? "Failed"))); } } catch (_) {} setState(() => _applying = false); }
+  @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text("Refer & Earn")), body: _loading ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(24), children: [
+    Card(child: Padding(padding: const EdgeInsets.all(24), child: Column(children: [const Icon(Icons.card_giftcard, size: 60, color: Color(0xFF6C63FF)), const SizedBox(height: 12), Text("Your Code", style: TextStyle(fontSize: 14, color: Colors.grey[600])), const SizedBox(height: 8), Text(_code ?? "", style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 2, color: Color(0xFF6C63FF))), const SizedBox(height: 16), Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [Column(children: [Text("$_points", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)), const Text("Points", style: TextStyle(color: Colors.grey))]), Column(children: [Text("$_totalReferrals", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)), const Text("Referred", style: TextStyle(color: Colors.grey))])]), const SizedBox(height: 20), ElevatedButton.icon(onPressed: _invite, icon: const Icon(Icons.share), label: const Text("Invite Friends"))]))),
+    const Divider(height: 40), const Text("Have a code?", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), const SizedBox(height: 12),
+    Row(children: [Expanded(child: TextField(controller: _referCtrl, decoration: const InputDecoration(labelText: "Enter code", border: OutlineInputBorder()))), const SizedBox(width: 12), ElevatedButton(onPressed: _applying ? null : _applyCode, child: _applying ? const SizedBox(height:20,width:20,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)) : const Text("Apply"))]),
+  ]));
 }
 
 class SupportPage extends StatefulWidget { const SupportPage({super.key}); @override State<SupportPage> createState() => _SupportPageState(); }
-class _SupportPageState extends State<SupportPage> {
-  final _subjectCtrl = TextEditingController();
-  final _descCtrl = TextEditingController();
-  bool _loading = false;
-  List _tickets = [];
-  bool _loadTickets = true;
-
+class _SupportPageState extends State<SupportPage> { final _subjectCtrl = TextEditingController(); final _descCtrl = TextEditingController(); bool _loading = false; List _tickets = []; bool _loadTickets = true;
   @override void initState() { super.initState(); _fetchTickets(); }
-  Future<void> _fetchTickets() async {
-    try {
-      final r = await api.getSupportTickets();
-      if (r["success"]) setState(() { _tickets = r["data"] ?? []; _loadTickets = false; });
-    } catch (_) { setState(() => _loadTickets = false); }
-  }
-  Future<void> _createTicket() async {
-    if (_subjectCtrl.text.isEmpty || _descCtrl.text.isEmpty) return;
-    setState(() => _loading = true);
-    try {
-      final r = await api.createSupportTicket(_subjectCtrl.text, _descCtrl.text);
-      if (r["success"]) {
-        _subjectCtrl.clear(); _descCtrl.clear();
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ticket created!")));
-        _fetchTickets();
-      }
-    } catch (_) {}
-    setState(() => _loading = false);
-  }
-  @override Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text("Support")),
-    body: _loadTickets ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(16), children: [
-      const Text("Create Ticket", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 12),
-      TextField(controller: _subjectCtrl, decoration: const InputDecoration(labelText: "Subject", border: OutlineInputBorder())),
-      const SizedBox(height: 8),
-      TextField(controller: _descCtrl, decoration: const InputDecoration(labelText: "Describe your issue", border: OutlineInputBorder()), maxLines: 3),
-      const SizedBox(height: 12),
-      ElevatedButton(onPressed: _loading ? null : _createTicket, child: _loading ? const SizedBox(height:20,width:20,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)) : const Text("Submit")),
-      const Divider(height: 32),
-      Text("My Tickets (${_tickets.length})", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-      ..._tickets.isEmpty ? [const Padding(padding: EdgeInsets.all(24), child: Text("No tickets yet"))] : _tickets.map((t) => Card(
-        child: ListTile(
-          leading: Icon(t["priority"] == "urgent" ? Icons.warning : Icons.support_agent, color: t["priority"] == "urgent" ? Colors.red : Colors.blue),
-          title: Text(t["subject"] ?? "Support"),
-          subtitle: Text(t["status"] ?? "open"),
-          trailing: Text(t["priority"] ?? "medium", style: const TextStyle(fontSize: 12)),
-        ),
-      )),
-    ]),
-  );
+  Future<void> _fetchTickets() async { try { final r = await api.getSupportTickets(); if (r["success"]) setState(() { _tickets = r["data"] ?? []; _loadTickets = false; }); } catch (_) { setState(() => _loadTickets = false); } }
+  Future<void> _createTicket() async { if (_subjectCtrl.text.isEmpty || _descCtrl.text.isEmpty) return; setState(() => _loading = true); try { final r = await api.createSupportTicket(_subjectCtrl.text, _descCtrl.text); if (r["success"]) { _subjectCtrl.clear(); _descCtrl.clear(); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Created!"))); _fetchTickets(); } } catch (_) {} setState(() => _loading = false); }
+  @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text("Support")), body: _loadTickets ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(16), children: [
+    const Text("Create Ticket", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 12), TextField(controller: _subjectCtrl, decoration: const InputDecoration(labelText: "Subject", border: OutlineInputBorder())), const SizedBox(height: 8),
+    TextField(controller: _descCtrl, decoration: const InputDecoration(labelText: "Issue", border: OutlineInputBorder()), maxLines: 3), const SizedBox(height: 12),
+    ElevatedButton(onPressed: _loading ? null : _createTicket, child: _loading ? const SizedBox(height:20,width:20,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)) : const Text("Submit")),
+    const Divider(height: 32), Text("My Tickets (${_tickets.length})", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+    ..._tickets.isEmpty ? [const Padding(padding: EdgeInsets.all(24), child: Text("No tickets"))] : _tickets.map((t) => Card(child: ListTile(leading: Icon(t["priority"] == "urgent" ? Icons.warning : Icons.support_agent, color: t["priority"] == "urgent" ? Colors.red : Colors.blue), title: Text(t["subject"] ?? "Support"), subtitle: Text(t["status"] ?? "open"), trailing: Text(t["priority"] ?? "medium", style: const TextStyle(fontSize: 12))))),
+  ]));
 }

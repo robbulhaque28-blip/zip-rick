@@ -7,19 +7,36 @@ export default function DashboardPage() {
     total_customers: 0, total_drivers: 0, pending_drivers: 0,
     active_rides: 0, today_rides: 0, revenue: { total: 0, today: 0 }
   });
+  const [error, setError] = useState('');
 
   const loadData = async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      if (!token) return;
+      if (!token) {
+        setError('Not logged in');
+        return;
+      }
       const res = await fetch(API + '/admin/dashboard', {
         headers: { Authorization: 'Bearer ' + token }
       });
+      
+      // If 401, token is expired - redirect to login
+      if (res.status === 401) {
+        localStorage.removeItem('admin_token');
+        window.location.href = '/login';
+        return;
+      }
+      
       const data = await res.json();
       if (data.success && data.data && data.data.overview) {
         setStats(data.data.overview);
+        setError('');
+      } else {
+        setError('Failed to load data');
       }
-    } catch (e) {}
+    } catch (e) {
+      setError('Network error');
+    }
   };
 
   useEffect(() => { loadData(); }, []);
@@ -29,6 +46,8 @@ export default function DashboardPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h1 style={{ margin: 0, fontSize: 24 }}>Zip-Rick Dashboard</h1>
       </div>
+      
+      {error && <p style={{ color: 'red', marginBottom: 12 }}>{error}</p>}
       
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
         <Card title="Total Customers" value={stats.total_customers || 0} color="#6C63FF" />
