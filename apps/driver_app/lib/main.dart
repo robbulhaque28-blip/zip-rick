@@ -532,10 +532,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
 
       // Then get precise location
       pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 8),
-        ),
+        desiredAccuracy: LocationAccuracy.high,
       );
       if (pos != null && mounted) {
         setState(() {
@@ -850,7 +847,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
         selectedItemColor: AppColors.primary,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.earnings), label: 'Earnings'),
+          BottomNavigationBarItem(icon: Icon(Icons.monetization_on), label: 'Earnings'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),

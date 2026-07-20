@@ -21,7 +21,7 @@ class ApiService {
     await prefs.remove('auth_token');
   }
 
-  static Map<String, String> _headers({bool auth = true}) async {
+  static Future<Map<String, String>> _headers({bool auth = true}) async {
     final h = <String, String>{
       'Content-Type': 'application/json',
     };
