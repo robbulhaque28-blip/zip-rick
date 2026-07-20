@@ -25,6 +25,7 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _searchResults = [];
   String? _appliedPromo;
   int _discount = 0;
+  String _rideMode = 'single';
   List<Map<String, dynamic>> _savedPlaces = [];
 
   @override
@@ -124,7 +125,30 @@ class _HomePageState extends State<HomePage> {
                   TextField(controller: _dropCtrl, decoration: InputDecoration(labelText: "Drop", prefixIcon: const Icon(Icons.location_on, color: Colors.red, size: 12), border: InputBorder.none, contentPadding: const EdgeInsets.all(16)), onChanged: (v) => _searchPlaces(v, false)),
                   ..._searchResults.where((p) => p["isPickup"] == false).take(3).map((p) => ListTile(dense: true, leading: const Icon(Icons.location_on, size: 16), title: Text(p["display_name"].toString(), style: const TextStyle(fontSize: 13)), onTap: () { _selectPlace(p); setSheet(() {}); })),
                 ])),
-              const SizedBox(height: 20),
+              // Ride mode selector
+              Container(padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                child: Row(children: [
+                  Expanded(child: GestureDetector(
+                    onTap: () => setSheet(() => _rideMode = 'single'),
+                    child: Container(padding: const EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(
+                      color: _rideMode == 'single' ? const Color(0xFF6C63FF) : Colors.grey.shade100,
+                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(8))),
+                      child: Text('Single', textAlign: TextAlign.center,
+                        style: TextStyle(fontWeight: FontWeight.bold, color: _rideMode == 'single' ? Colors.white : Colors.black87, fontSize: 14)),
+                    ),
+                  )),
+                  Expanded(child: GestureDetector(
+                    onTap: () => setSheet(() => _rideMode = 'sharing'),
+                    child: Container(padding: const EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(
+                      color: _rideMode == 'sharing' ? const Color(0xFF00D9A6) : Colors.grey.shade100,
+                      borderRadius: const BorderRadius.horizontal(right: Radius.circular(8))),
+                      child: Text('Sharing', textAlign: TextAlign.center,
+                        style: TextStyle(fontWeight: FontWeight.bold, color: _rideMode == 'sharing' ? Colors.white : Colors.black87, fontSize: 14)),
+                    ),
+                  )),
+                ]),
+              ),
+              const SizedBox(height: 12),
               SizedBox(width: double.infinity, height: 56, child: ElevatedButton(
                 onPressed: _pickupLoc == null || _dropLoc == null ? null : () { Navigator.pop(ctx); _getFare(); },
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
@@ -139,7 +163,7 @@ class _HomePageState extends State<HomePage> {
     if (_pickupLoc == null || _dropLoc == null) return;
     setState(() => _isBooking = true);
     try {
-      final r = await _api.getFareEstimate(_pickupLoc!.latitude, _pickupLoc!.longitude, _dropLoc!.latitude, _dropLoc!.longitude);
+      final r = await _api.getFareEstimate(_pickupLoc!.latitude, _pickupLoc!.longitude, _dropLoc!.latitude, _dropLoc!.longitude, rideMode: _rideMode);
       if (r["success"]) { setState(() => _isBooking = false); _showPayment((r["data"]?["total_fare"] ?? 30).toInt(), r["data"]); }
       else { setState(() => _isBooking = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r["error"]?["message"] ?? "Error"))); }
     } catch (e) { setState(() => _isBooking = false); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection error"))); }
@@ -198,7 +222,7 @@ class _HomePageState extends State<HomePage> {
     if (_pickupLoc == null || _dropLoc == null) return;
     setState(() => _isBooking = true);
     try {
-      final r = await _api.bookRide(_pickupLoc!.latitude, _pickupLoc!.longitude, _pickupCtrl.text, _dropLoc!.latitude, _dropLoc!.longitude, _dropCtrl.text, pm, _appliedPromo ?? "");
+      final r = await _api.bookRide(_pickupLoc!.latitude, _pickupLoc!.longitude, _pickupCtrl.text, _dropLoc!.latitude, _dropLoc!.longitude, _dropCtrl.text, pm, _appliedPromo ?? "", rideMode: _rideMode);
       if (r["success"]) { if (!mounted) return; Navigator.push(context, MaterialPageRoute(builder: (_) => RideTrackingPage(rideData: r["data"]["ride"]))); }
       else { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r["error"]?["message"] ?? "Booking failed"))); }
     } catch (_) {}

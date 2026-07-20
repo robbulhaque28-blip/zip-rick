@@ -38,7 +38,8 @@ async function getRoute(pickup_lat, pickup_lng, drop_lat, drop_lng) {
 module.exports = {
   getFareEstimate: asyncHandler(async (req, res) => {
     const route = await getRoute(req.body.pickup_latitude, req.body.pickup_longitude, req.body.drop_latitude, req.body.drop_longitude);
-    const fare = await FareService.calculateFare({ distanceMeters: route.distance_meters, durationSeconds: route.duration_seconds });
+    const rideMode = req.body.ride_mode || 'single';
+    const fare = await FareService.calculateFare({ distanceMeters: route.distance_meters, durationSeconds: route.duration_seconds, ride_mode: rideMode });
     let promoDiscount = 0, promoApplied = false;
     if (req.body.promo_code) { const p = await FareService.applyPromo(fare.total_fare, req.body.promo_code); promoDiscount = p.discount; promoApplied = p.promo_applied; }
     return success(res, { ...fare, promo_discount: promoDiscount, promo_applied: promoApplied, final_fare: parseFloat((fare.total_fare - promoDiscount).toFixed(2)), route }, 'Fare estimated');
@@ -47,7 +48,8 @@ module.exports = {
     const customer = await Customer.findOne({ where: { user_id: req.userId } });
     if (!customer) throw new ApiError(404, 'Customer not found');
     const route = await getRoute(req.body.pickup_latitude, req.body.pickup_longitude, req.body.drop_latitude, req.body.drop_longitude);
-    const fare = await FareService.calculateFare({ distanceMeters: req.body.route_distance || route.distance_meters, durationSeconds: req.body.route_duration || route.duration_seconds });
+    const rideMode = req.body.ride_mode || 'single';
+    const fare = await FareService.calculateFare({ distanceMeters: req.body.route_distance || route.distance_meters, durationSeconds: req.body.route_duration || route.duration_seconds, ride_mode: rideMode });
     let promoDiscount = 0, promoCodeId = null;
     if (req.body.promo_code) { const p = await FareService.applyPromo(fare.total_fare, req.body.promo_code); promoDiscount = p.discount; promoCodeId = p.promo_code_id; }
     const totalFare = parseFloat((fare.total_fare - promoDiscount).toFixed(2));
