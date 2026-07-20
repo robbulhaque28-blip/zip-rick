@@ -1,232 +1,190 @@
-/**
- * RideMatchingService
- * Finds nearest available drivers, sends requests sequentially,
- * and assigns the first driver to accept.
- */
 const { Op } = require('sequelize');
 const { Driver, Ride, RideStatusLog } = require('../models');
-const config = require('../config');
+const { getIO } = require('../sockets');
 const logger = require('../utils/logger');
 
 class RideMatchingService {
   constructor() {
-    this.activeSearches = new Map(); // rideId -> { timeout, driversTried, maxDrivers }
-    this.searchTimeouts = new Map(); // rideId -> timeoutId
+    this.activeSearches = new Map();
+    this.searchTimeouts = new Map();
   }
 
-  /**
-   * Find nearest available drivers
-   * @param {number} lat - Pickup latitude
-   * @param {number} lng - Pickup longitude
-   * @param {number} radiusKm - Search radius in KM
-   * @param {number} limit - Max drivers to return
-   * @returns {Array} Sorted drivers by distance
-   */
   async findNearbyDrivers(lat, lng, radiusKm = 5, limit = 10) {
-    try {
-      const drivers = await Driver.findAll({
-        where: {
-          is_online: true,
-          is_available: true,
-          registration_status: 'approved',
-          current_ride_id: null,
-          current_latitude: { [Op.ne]: null },
-          current_longitude: { [Op.ne]: null },
-        },
-        include: [
-          {
-            association: 'user',
-            attributes: ['id', 'full_name', 'phone', 'avatar_url'],
-          },
-          {
-            association: 'vehicle',
-            attributes: ['vehicle_number', 'model', 'color'],
-          },
-        ],
-        limit,
-        order: [['total_rides', 'DESC']],
-      });
-
-      const driversWithDistance = drivers
-        .map((driver) => {
-          const distance = this._calculateDistance(
-            lat,
-            lng,
-            parseFloat(driver.current_latitude),
-            parseFloat(driver.current_longitude)
-          );
-          return { driver, distance_km: distance };
-        })
-        .filter((d) => d.distance_km <= radiusKm)
-        .sort((a, b) => a.distance_km - b.distance_km);
-
-      return driversWithDistance;
-    } catch (error) {
-      logger.error('Error finding nearby drivers:', error);
-      throw error;
-    }
+    const drivers = await Driver.findAll({
+      where: {
+        is_online: true,
+        is_available: true,
+        registration_status: 'approved',
+        current_ride_id: null,
+        current_latitude: { [Op.ne]: null }
+      },
+      include: [
+        { association: 'user', attributes: ['id', 'full_name', 'phone', 'avatar_url'] },
+        { association: 'vehicle' }
+      ],
+      limit,
+    });
+    const R = 6371;
+    return drivers.map(d => {
+      const dLat = (parseFloat(d.current_latitude) - lat) * Math.PI / 180;
+      const dLng = (parseFloat(d.current_longitude) - lng) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat*Math.PI/180) * Math.cos(parseFloat(d.current_latitude)*Math.PI/180) * Math.sin(dLng/2)**2;
+      const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return { driver: d, distance_km: dist };
+    }).filter(d => d.distance_km <= radiusKm).sort((a, b) => a.distance_km - b.distance_km);
   }
 
-  /**
-   * Start searching for a driver for a ride
-   */
   async startSearch(ride, onDriverFound, onNoDrivers) {
-    const rideId = ride.id;
-    const searchConfig = {
-      rideId,
-      driversTried: new Set(),
-      maxDrivers: 10,
-      currentIndex: 0,
-      nearbyDrivers: [],
-    };
-    this.activeSearches.set(rideId, searchConfig);
-
-    const nearbyDrivers = await this.findNearbyDrivers(
+    const nearby = await this.findNearbyDrivers(
       parseFloat(ride.pickup_latitude),
-      parseFloat(ride.pickup_longitude),
-      5,
-      searchConfig.maxDrivers
+      parseFloat(ride.pickup_longitude)
     );
-
-    if (nearbyDrivers.length === 0) {
-      logger.info(`No nearby drivers found for ride ${ride.ride_number}`);
-      await this._handleNoDrivers(ride, onNoDrivers);
+    
+    if (nearby.length === 0) {
+      ride.status = 'no_driver_found';
+      await ride.save();
+      logger.info(`No nearby drivers for ride ${ride.ride_number}`);
+      if (onNoDrivers) onNoDrivers(ride);
       return;
     }
 
-    searchConfig.nearbyDrivers = nearbyDrivers;
-    searchConfig.currentIndex = 0;
-    logger.info(`Found ${nearbyDrivers.length} nearby drivers for ride ${ride.ride_number}`);
+    this.activeSearches.set(ride.id, {
+      rideId: ride.id,
+      nearby,
+      index: 0,
+      rideData: {
+        id: ride.id,
+        ride_number: ride.ride_number,
+        pickup_latitude: ride.pickup_latitude,
+        pickup_longitude: ride.pickup_longitude,
+        pickup_address: ride.pickup_address,
+        drop_latitude: ride.drop_latitude,
+        drop_longitude: ride.drop_longitude,
+        drop_address: ride.drop_address,
+        total_fare: ride.total_fare,
+        route_distance: ride.route_distance,
+        route_duration: ride.route_duration,
+        payment_method: ride.payment_method,
+      }
+    });
 
-    await this._sendRequestToNextDriver(rideId, onDriverFound, onNoDrivers);
+    // Emit socket event to each nearby driver
+    const io = getIO();
+    if (io) {
+      for (const entry of nearby) {
+        const driverUserId = entry.driver.user_id;
+        const room = `user:${driverUserId}`;
+        io.to(room).emit('ride:new_request', {
+          ride_id: ride.id,
+          ride_number: ride.ride_number,
+          pickup_address: ride.pickup_address,
+          pickup_latitude: ride.pickup_latitude,
+          pickup_longitude: ride.pickup_longitude,
+          drop_address: ride.drop_address,
+          drop_latitude: ride.drop_latitude,
+          drop_longitude: ride.drop_longitude,
+          total_fare: ride.total_fare,
+          distance_km: parseFloat(entry.distance_km.toFixed(1)),
+          route_distance: ride.route_distance,
+          route_duration: ride.route_duration,
+          payment_method: ride.payment_method,
+          driver_name: entry.driver.user?.full_name,
+          customer_pickup: ride.pickup_address,
+          customer_drop: ride.drop_address,
+        });
+        logger.info(`Ride request ${ride.ride_number} sent to driver ${driverUserId} (${entry.distance_km.toFixed(1)}km away)`);
+      }
+    }
 
-    const timeoutId = setTimeout(async () => {
-      await this._handleSearchTimeout(rideId, onNoDrivers);
+    // Set 60-second timeout: if no driver accepts, mark as no_driver_found
+    const tid = setTimeout(async () => {
+      // Re-check ride status — maybe a driver already accepted
+      const currentRide = await Ride.findByPk(ride.id);
+      if (currentRide && currentRide.status === 'searching') {
+        currentRide.status = 'no_driver_found';
+        await currentRide.save();
+        logger.info(`Ride ${ride.ride_number}: No driver accepted within timeout`);
+        if (onNoDrivers) onNoDrivers(currentRide);
+      }
+      this._cleanup(ride.id);
     }, 60000);
-    this.searchTimeouts.set(rideId, timeoutId);
-  }
+    this.searchTimeouts.set(ride.id, tid);
 
-  async _sendRequestToNextDriver(rideId, onDriverFound, onNoDrivers) {
-    const search = this.activeSearches.get(rideId);
-    if (!search || search.currentIndex >= search.nearbyDrivers.length) {
-      await this._handleNoDrivers(rideId, onNoDrivers);
-      return;
-    }
-    const { driver, distance_km } = search.nearbyDrivers[search.currentIndex];
-    search.currentIndex++;
-    search.driversTried.add(driver.id);
-    logger.info(`Sending ride request to driver ${driver.id} (attempt ${search.currentIndex}/${search.nearbyDrivers.length})`);
-    return { driver, distance_km, search };
+    logger.info(`Search started for ride ${ride.ride_number}: ${nearby.length} nearby drivers notified via socket`);
   }
 
   async handleDriverAccept(rideId, driverId) {
-    const search = this.activeSearches.get(rideId);
-    if (!search) {
-      logger.warn(`No active search for ride ${rideId}`);
-      return null;
-    }
-
-    const timeoutId = this.searchTimeouts.get(rideId);
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-      this.searchTimeouts.delete(rideId);
-    }
-
     const ride = await Ride.findByPk(rideId);
-    if (!ride || ride.status !== 'searching') {
-      logger.warn(`Ride ${rideId} is no longer in searching state`);
-      return null;
-    }
-
+    if (!ride || ride.status !== 'searching') return null;
+    
     ride.driver_id = driverId;
     ride.status = 'driver_assigned';
     ride.driver_assigned_at = new Date();
     await ride.save();
-
+    
     await RideStatusLog.create({
       ride_id: rideId,
       previous_status: 'searching',
       new_status: 'driver_assigned',
       changed_by: 'driver',
-      changed_by_id: driverId,
+      changed_by_id: driverId
     });
-
+    
     await Driver.update(
       { is_available: false, current_ride_id: rideId },
       { where: { id: driverId } }
     );
-
-    this.activeSearches.delete(rideId);
+    
+    // Notify all other nearby drivers that this ride is taken
+    const io = getIO();
+    if (io) {
+      const search = this.activeSearches.get(rideId);
+      if (search) {
+        for (const entry of search.nearby) {
+          if (entry.driver.id !== driverId && entry.driver.user_id) {
+            io.to(`user:${entry.driver.user_id}`).emit('ride:taken', { ride_id: rideId });
+          }
+        }
+      }
+      // Notify customer via their user_id
+      const customer = await ride.getCustomer({ include: [{ association: 'user', attributes: ['id'] }] });
+      const customerUserId = customer?.user?.id;
+      const driver = await Driver.findByPk(driverId, {
+        include: [{ association: 'user', attributes: ['id', 'full_name', 'phone', 'avatar_url'] }, { association: 'vehicle' }]
+      });
+      if (driver && customerUserId) {
+        io.to(`user:${customerUserId}`).emit('ride:accepted', {
+          ride_id: ride.id,
+          driver: {
+            id: driver.id,
+            name: driver.user?.full_name || 'Driver',
+            phone: driver.user?.phone,
+            avatar_url: driver.user?.avatar_url,
+            vehicle_number: driver.vehicle?.vehicle_number || '',
+            vehicle_model: driver.vehicle?.vehicle_model || '',
+            rating: driver.rating_avg,
+          }
+        });
+      }
+    }
+    
+    this._cleanup(rideId);
     logger.info(`Driver ${driverId} accepted ride ${ride.ride_number}`);
     return ride;
   }
 
-  async handleDriverReject(rideId, driverId) {
-    const search = this.activeSearches.get(rideId);
-    if (!search) return;
-    const result = await this._sendRequestToNextDriver(rideId, null, null);
-    return result;
-  }
-
-  async _handleNoDrivers(rideOrId, onNoDrivers) {
-    const rideId = typeof rideOrId === 'object' ? rideOrId.id : rideOrId;
-    const ride = await Ride.findByPk(rideId);
-    if (ride && ride.status === 'searching') {
-      ride.status = 'no_driver_found';
-      await ride.save();
-      await RideStatusLog.create({
-        ride_id: rideId,
-        previous_status: 'searching',
-        new_status: 'no_driver_found',
-        changed_by: 'system',
-      });
-    }
+  cancelSearch(rideId) {
     this._cleanup(rideId);
-    if (onNoDrivers) onNoDrivers(ride);
   }
-
-  async _handleSearchTimeout(rideId, onNoDrivers) {
-    const search = this.activeSearches.get(rideId);
-    if (!search) return;
-    const ride = await Ride.findByPk(rideId);
-    if (ride && ride.status === 'searching') {
-      ride.status = 'no_driver_found';
-      await ride.save();
-      await RideStatusLog.create({
-        ride_id: rideId,
-        previous_status: 'searching',
-        new_status: 'no_driver_found',
-        changed_by: 'system',
-        metadata: { reason: 'search_timeout' },
-      });
-    }
-    this._cleanup(rideId);
-    if (onNoDrivers) onNoDrivers(ride);
-  }
-
-  cancelSearch(rideId) { this._cleanup(rideId); }
 
   _cleanup(rideId) {
     this.activeSearches.delete(rideId);
-    const timeoutId = this.searchTimeouts.get(rideId);
-    if (timeoutId) { clearTimeout(timeoutId); this.searchTimeouts.delete(rideId); }
+    const t = this.searchTimeouts.get(rideId);
+    if (t) {
+      clearTimeout(t);
+      this.searchTimeouts.delete(rideId);
+    }
   }
-
-  _calculateDistance(lat1, lng1, lat2, lng2) {
-    const R = 6371;
-    const dLat = this._toRad(lat2 - lat1);
-    const dLng = this._toRad(lng2 - lng1);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(this._toRad(lat1)) *
-        Math.cos(this._toRad(lat2)) *
-        Math.sin(dLng / 2) *
-        Math.sin(dLng / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  }
-
-  _toRad(deg) { return deg * (Math.PI / 180); }
 }
 
 module.exports = new RideMatchingService();

@@ -1,4 +1,4 @@
-﻿const dotenv = require('dotenv');
+const dotenv = require('dotenv');
 const path = require('path');
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
@@ -32,6 +32,9 @@ const config = Object.freeze({
     projectId: process.env.FIREBASE_PROJECT_ID,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
     privateKey: process.env.FIREBASE_PRIVATE_KEY,
+  },
+  googleMaps: {
+    apiKey: process.env.GOOGLE_MAPS_API_KEY || '',
   },
   logging: { level: process.env.LOG_LEVEL || 'debug', dir: './logs' },
   corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : ['http://localhost:3000', 'http://localhost:5173', 'https://zip-rick-admin.onrender.com'],
