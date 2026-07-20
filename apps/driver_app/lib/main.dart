@@ -101,31 +101,34 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(body: SafeArea(
-    child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const SizedBox(height: 40),
-      const Icon(Icons.electric_rickshaw_rounded, size: 64, color: AppColors.primary),
-      const SizedBox(height: 24),
-      Text(_showOtp ? 'Verify OTP' : 'Driver Registration', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-      const SizedBox(height: 8),
-      Text(_showOtp ? 'Enter OTP sent to your phone' : 'Step 1 of 4: Enter your details', style: const TextStyle(color: AppColors.textLight, fontSize: 16)),
-      const SizedBox(height: 32),
-      if (!_showOtp) ...[
-        TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Full Name *', prefixIcon: Icon(Icons.person), border: OutlineInputBorder())),
-        const SizedBox(height: 16),
-      ],
-      TextField(controller: _phoneCtrl, enabled: !_showOtp, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone Number *', prefixIcon: Icon(Icons.phone_android), border: OutlineInputBorder())),
-      if (_showOtp) ...[
-        const SizedBox(height: 16),
-        TextField(controller: _otpCtrl, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'OTP', prefixIcon: Icon(Icons.lock_outline), border: OutlineInputBorder())),
-      ],
-      if (_error.isNotEmpty) ...[const SizedBox(height: 12), Text(_error, style: const TextStyle(color: Colors.red))],
-      const SizedBox(height: 24),
-      SizedBox(width: double.infinity, height: 52, child: ElevatedButton(
-        onPressed: _loading ? null : (_showOtp ? _verifyOtp : _sendOtp),
-        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-        child: _loading ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Text(_showOtp ? 'Verify & Continue' : 'Send OTP', style: const TextStyle(fontSize: 16)))),
-    ])));
+  Widget build(BuildContext context) {
+    return Scaffold(body: SafeArea(
+      child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SizedBox(height: 40),
+        const Icon(Icons.electric_rickshaw_rounded, size: 64, color: AppColors.primary),
+        const SizedBox(height: 24),
+        Text(_showOtp ? 'Verify OTP' : 'Driver Registration', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Text(_showOtp ? 'Enter OTP sent to your phone' : 'Step 1 of 4: Enter your details', style: const TextStyle(color: AppColors.textLight, fontSize: 16)),
+        const SizedBox(height: 32),
+        if (!_showOtp) ...[
+          TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Full Name *', prefixIcon: Icon(Icons.person), border: OutlineInputBorder())),
+          const SizedBox(height: 16),
+        ],
+        TextField(controller: _phoneCtrl, enabled: !_showOtp, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone Number *', prefixIcon: Icon(Icons.phone_android), border: OutlineInputBorder())),
+        if (_showOtp) ...[
+          const SizedBox(height: 16),
+          TextField(controller: _otpCtrl, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'OTP', prefixIcon: Icon(Icons.lock_outline), border: OutlineInputBorder())),
+        ],
+        if (_error.isNotEmpty) ...[const SizedBox(height: 12), Text(_error, style: const TextStyle(color: Colors.red))],
+        const SizedBox(height: 24),
+        SizedBox(width: double.infinity, height: 52, child: ElevatedButton(
+          onPressed: _loading ? null : (_showOtp ? _verifyOtp : _sendOtp),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+          child: _loading ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Text(_showOtp ? 'Verify & Continue' : 'Send OTP', style: const TextStyle(fontSize: 16))),
+        ),
+      ])),
+    ));
   }
   @override
   void dispose() { _phoneCtrl.dispose(); _nameCtrl.dispose(); _otpCtrl.dispose(); super.dispose(); }
@@ -624,7 +627,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       const SizedBox(height: 20),
       Row(children: [
         Expanded(child: _sc('Rating', '${_driverProfile?['rating_avg'] ?? '0.0'}', Icons.star, Colors.amber)),
-        const SizedBox(width: 8), Expanded(child: _sc('Rides', '${_driverProfile?['total_rides'] ?? '0'}', Icons.ride, AppColors.primary)),
+        const SizedBox(width: 8), Expanded(child: _sc('Rides', '${_driverProfile?['total_rides'] ?? '0'}', Icons.directions_car, AppColors.primary)),
         const SizedBox(width: 8), Expanded(child: _sc('Status', '${_driverProfile?['registration_status'] ?? 'pending'}', Icons.verified_user, AppColors.success)),
       ]),
       const SizedBox(height: 20),
