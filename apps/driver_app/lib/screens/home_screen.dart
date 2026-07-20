@@ -192,7 +192,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
           ])),
           Switch(value: _isOnline, onChanged: _togglingOnline ? null : (_) => _toggleOnline(), activeColor: const Color(0xFF4CAF50)),
         ])),
-      Expanded(child: Container(margin: const EdgeInsets.symmetric(horizontal: 16), decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
+      Expanded(
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
         child: _currentLoc != null
           ? FlutterMap(options: MapOptions(center: _currentLoc!, zoom: 15), children: [
               TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.ziprick.driver'),
