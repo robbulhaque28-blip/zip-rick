@@ -1,4 +1,4 @@
-﻿import "package:flutter/material.dart";
+import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:flutter_map/flutter_map.dart";
 import "package:latlong2/latlong.dart";
@@ -230,8 +230,17 @@ class _HomePageState extends State<HomePage> {
     setState(() => _loading = true);
     try {
       final r = await api.getFareEstimate(_pickupLocation!.latitude, _pickupLocation!.longitude, _dropLocation!.latitude, _dropLocation!.longitude);
-      if (r["success"]) { setState(() { _fareData = r["data"]; _loading = false; }); _showRideType(); }
-    } catch (_) { setState(() => _loading = false); }
+      if (r["success"]) {
+        setState(() { _fareData = r["data"]; _loading = false; });
+        _showPayment((r["data"]?["total_fare"] ?? 30).toInt());
+      } else {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r["error"]?["message"] ?? "Could not get fare. Try again.")));
+      }
+    } catch (e) {
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection error. Check your internet.")));
+    }
   }
 
   void _showRideType() {
