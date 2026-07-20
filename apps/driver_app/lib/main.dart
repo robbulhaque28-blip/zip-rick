@@ -121,12 +121,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _sendOtp() async {
     setState(() { _loading = true; _error = ''; });
     try {
-      final res = await ApiService.sendOtp(_phoneCtrl.text.trim());
-      if (res['data'] != null && res['data']['is_new_user'] == true) {
-        setState(() { _isNewUser = true; _otpSent = true; _loading = false; });
-      } else {
-        setState(() { _otpSent = true; _isNewUser = false; _loading = false; });
-      }
+      await ApiService.sendOtp(_phoneCtrl.text.trim());
+      setState(() { _otpSent = true; _loading = false; });
     } catch (e) {
       setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
     }
@@ -136,15 +132,26 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() { _loading = true; _error = ''; });
     final phone = _phoneCtrl.text.trim();
     final otp = _otpCtrl.text.trim();
+    if (otp.length < 4) {
+      setState(() { _error = 'Please enter the OTP'; _loading = false; });
+      return;
+    }
     try {
-      if (_isNewUser) {
-        // New user - go to register
-        if (mounted) Navigator.pushReplacementNamed(context, '/register', arguments: {'phone': phone, 'otp': otp});
-        return;
-      }
       final res = await ApiService.verifyOtp(phone, otp);
-      if (res['data'] != null && res['data']['token'] != null) {
-        await ApiService.saveToken(res['data']['token']);
+      final data = res['data'];
+      if (data != null && data['tokens'] != null && data['tokens']['accessToken'] != null) {
+        // Check if user needs to complete registration
+        if (data['is_new_user'] == true || (data['user'] != null && data['user']['full_name'] == null)) {
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, '/register', arguments: {
+              'phone': phone,
+              'otp': otp,
+              'token': data['tokens']['accessToken'],
+            });
+          }
+          return;
+        }
+        await ApiService.saveToken(data['tokens']['accessToken']);
         if (mounted) Navigator.pushReplacementNamed(context, '/home');
       } else {
         setState(() { _error = 'Invalid response from server'; _loading = false; });
@@ -260,6 +267,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String _phone = '';
   String _otp = '';
+  String _token = '';
 
   @override
   void didChangeDependencies() {
@@ -268,6 +276,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (args != null) {
       _phone = args['phone'] ?? '';
       _otp = args['otp'] ?? '';
+      _token = args['token'] ?? '';
     }
   }
 
@@ -278,10 +287,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
     setState(() { _loading = true; _error = ''; });
     try {
-      // If OTP was already verified, use register endpoint
-      final res = await ApiService.registerDriver(_phone, _nameCtrl.text.trim(), _otp);
-      if (res['data'] != null && res['data']['token'] != null) {
-        await ApiService.saveToken(res['data']['token']);
+      // Use verify-otp with full_name to register new user
+      final res = await ApiService.verifyOtp(_phone, _otp, fullName: _nameCtrl.text.trim());
+      final data = res['data'];
+      if (data != null && data['tokens'] != null && data['tokens']['accessToken'] != null) {
+        await ApiService.saveToken(data['tokens']['accessToken']);
         // Save vehicle info
         if (_vehicleNoCtrl.text.isNotEmpty || _vehicleModelCtrl.text.isNotEmpty) {
           try {

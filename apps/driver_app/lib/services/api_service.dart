@@ -82,12 +82,11 @@ class ApiService {
     return post('/auth/send-otp', {'phone': phone}, auth: false);
   }
 
-  static Future<Map<String, dynamic>> verifyOtp(String phone, String otp) {
-    return post('/auth/verify-otp', {'phone': phone, 'otp': otp, 'role': 'driver'}, auth: false);
-  }
-
-  static Future<Map<String, dynamic>> registerDriver(String phone, String name, String otp) {
-    return post('/auth/register', {'phone': phone, 'full_name': name, 'otp': otp, 'role': 'driver'}, auth: false);
+  // Verify OTP - returns { user, profile, tokens: { accessToken, refreshToken }, is_new_user }
+  static Future<Map<String, dynamic>> verifyOtp(String phone, String otp, {String role = 'driver', String? fullName}) {
+    final body = <String, dynamic>{'phone': phone, 'otp': otp, 'role': role};
+    if (fullName != null && fullName.isNotEmpty) body['full_name'] = fullName;
+    return post('/auth/verify-otp', body, auth: false);
   }
 
   // --- Driver Profile ---
