@@ -196,12 +196,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
-        child: _currentLoc != null
-          ? FlutterMap(options: MapOptions(center: _currentLoc!, zoom: 15), children: [
-              TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.ziprick.driver'),
-              MarkerLayer(markers: [Marker(point: _currentLoc!, width: 80, height: 80, child: Icon(Icons.electric_rickshaw_rounded, size: 48, color: _isOnline ? const Color(0xFF4CAF50) : const Color(0xFF9CA3AF)))]),
-            ])
-          : const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [CircularProgressIndicator(), SizedBox(height: 12), Text('Fetching location...')]))),
+          child: _currentLoc != null
+              ? FlutterMap(options: MapOptions(center: _currentLoc!, zoom: 15), children: [
+                  TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.ziprick.driver'),
+                  MarkerLayer(markers: [Marker(point: _currentLoc!, width: 80, height: 80, child: Icon(Icons.electric_rickshaw_rounded, size: 48, color: _isOnline ? const Color(0xFF4CAF50) : const Color(0xFF9CA3AF)))]),
+                ])
+              : const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [CircularProgressIndicator(), SizedBox(height: 12), Text('Fetching location...')])),
+        ),
+      ),
       const SizedBox(height: 12),
       Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: SizedBox(width: double.infinity, height: 48, child: ElevatedButton.icon(onPressed: _fetchLocation, icon: const Icon(Icons.my_location), label: const Text('Refresh Location'),
         style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))))),
