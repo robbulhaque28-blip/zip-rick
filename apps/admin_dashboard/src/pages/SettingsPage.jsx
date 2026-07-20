@@ -128,22 +128,31 @@ export default function SettingsPage() {
           </Card>
         </Grid>
 
-        {/* Registration Fee + Commission */}
+        {/* Registration Fee */}
         <Grid item xs={12} md={6}>
           <Card sx={{ height: '100%' }}>
             <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>📋 Registration Fee</Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, pb: 1, borderBottom: '2px solid #6C63FF' }}>
+                📋 Registration Fee
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                 <TextField fullWidth label="Standard Fee (₹)" type="number" value={fee.standard} onChange={e => setFee({...fee, standard: parseFloat(e.target.value) || 999})} />
                 <TextField fullWidth label="Promotional Fee (₹)" type="number" value={fee.promotional} onChange={e => setFee({...fee, promotional: parseFloat(e.target.value) || 499})} />
                 <FormControlLabel control={<Switch checked={fee.promotion_active} onChange={e => setFee({...fee, promotion_active: e.target.checked})} />} label="Promotion Active" />
-                <Button variant="contained" onClick={saveFee} sx={{ alignSelf: 'flex-start' }}>Save Fee</Button>
+                <Button variant="contained" onClick={saveFee} sx={{ alignSelf: 'flex-start', mt: 1 }}>Save Fee</Button>
               </Box>
+            </CardContent>
+          </Card>
+        </Grid>
 
-              <Divider sx={{ my: 3 }} />
-
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>💰 Commission</Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {/* Commission */}
+        <Grid item xs={12} md={6}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, pb: 1, borderBottom: '2px solid #00D9A6' }}>
+                💰 Commission
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                 <TextField fullWidth label="Commission Rate (%)" type="number" value={commission.rate} onChange={e => setCommission({...commission, rate: parseFloat(e.target.value) || 10})} />
                 <Button variant="contained" onClick={saveCommission} sx={{ alignSelf: 'flex-start' }}>Save Commission</Button>
               </Box>
