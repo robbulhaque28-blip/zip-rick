@@ -590,7 +590,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
           ])),
           Switch(value: _isOnline, onChanged: _togglingOnline ? null : (_) => _toggleOnline(), activeColor: AppColors.success),
         ])),
-      Expanded(child: Container(margin: const EdgeInsets.symmetric(horizontal: 16), decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)), clipBehavior: Clip.antiAlias,
+      Expanded(child: Container(margin: const EdgeInsets.symmetric(horizontal: 16), clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
         child: _currentPosition != null ? FlutterMap(options: MapOptions(center: LatLng(_currentPosition!.latitude, _currentPosition!.longitude), zoom: 15), children: [
           TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.ziprick.driver'),
           MarkerLayer(markers: [Marker(point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude), width: 80, height: 80, child: Icon(Icons.electric_rickshaw_rounded, size: 48, color: _isOnline ? AppColors.success : AppColors.textLight))]),
