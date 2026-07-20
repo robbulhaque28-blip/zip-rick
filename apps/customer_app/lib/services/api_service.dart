@@ -19,6 +19,11 @@ class ApiService {
     await prefs.setString('customer_token', token);
   }
 
+  Future<String?> getToken() async {
+    await _loadToken();
+    return _token;
+  }
+
   Future<void> clearToken() async {
     _token = null;
     final prefs = await SharedPreferences.getInstance();
@@ -90,6 +95,11 @@ class ApiService {
 
   Future<Map<String, dynamic>> createSupportTicket(String subject, String description) async {
     final res = await http.post(Uri.parse(baseUrl + '/support/tickets'), headers: await _headers(), body: jsonEncode({'subject': subject, 'description': description}));
+    return jsonDecode(res.body);
+  }
+
+  Future<Map<String, dynamic>> updateProfile(String fullName) async {
+    final res = await http.put(Uri.parse(baseUrl + '/auth/profile'), headers: await _headers(), body: jsonEncode({'full_name': fullName}));
     return jsonDecode(res.body);
   }
 
