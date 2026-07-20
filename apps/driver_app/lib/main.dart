@@ -156,15 +156,27 @@ class _RegisterDocsScreenState extends State<RegisterDocsScreen> {
     if (x != null) setState(() => _docs[key] = x);
   }
 
-  String _label(String k) => ({
-    'aadhaar_front': 'Aadhaar Card (Front)', 'aadhaar_back': 'Aadhaar Card (Back)',
-    'selfie': 'Live Passport Photo', 'rc': 'Vehicle RC', 'insurance': 'Vehicle Insurance'
-  })[k] ?? k;
+  String _label(String k) {
+    switch (k) {
+      case 'aadhaar_front': return 'Aadhaar Card (Front)';
+      case 'aadhaar_back': return 'Aadhaar Card (Back)';
+      case 'selfie': return 'Live Passport Photo';
+      case 'rc': return 'Vehicle RC';
+      case 'insurance': return 'Vehicle Insurance';
+      default: return k;
+    }
+  }
 
-  IconData _icon(String k) => ({
-    'aadhaar_front': Icons.badge, 'aadhaar_back': Icons.badge, 'selfie': Icons.camera_alt,
-    'rc': Icons.directions_car, 'insurance': Icons.verified
-  })[k] ?? Icons.upload_file;
+  IconData _icon(String k) {
+    switch (k) {
+      case 'aadhaar_front': return Icons.badge;
+      case 'aadhaar_back': return Icons.badge;
+      case 'selfie': return Icons.camera_alt;
+      case 'rc': return Icons.directions_car;
+      case 'insurance': return Icons.verified;
+      default: return Icons.upload_file;
+    }
+  }
 
   Future<void> _submit() async {
     if (_docs['aadhaar_front'] == null || _docs['selfie'] == null) {
@@ -193,7 +205,8 @@ class _RegisterDocsScreenState extends State<RegisterDocsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    return Scaffold(
     appBar: AppBar(title: const Text('Upload Documents & Bank Details')),
     body: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Step 2 of 4', style: TextStyle(color: AppColors.textLight, fontSize: 14)),
