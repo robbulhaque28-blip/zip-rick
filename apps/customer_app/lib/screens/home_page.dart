@@ -19,9 +19,9 @@ class _HomePageState extends State<HomePage> {
   final _pickupCtrl = TextEditingController();
   final _dropCtrl = TextEditingController();
   final _promoCtrl = TextEditingController();
-  LatLng _currentLoc = const LatLng(26.1445, 91.7362);
+  LatLng? _currentLoc;
   LatLng? _pickupLoc, _dropLoc;
-  bool _loading = true, _isBooking = false;
+  bool _loading = true, _isBooking = false, _locationDone = false;
   List<Map<String, dynamic>> _searchResults = [];
   String? _appliedPromo;
   int _discount = 0;
@@ -48,11 +48,24 @@ class _HomePageState extends State<HomePage> {
   Future<void> _getLocation() async {
     try {
       if (await Geolocator.requestPermission() == LocationPermission.whileInUse || await Geolocator.checkPermission() == LocationPermission.always) {
-        final p = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high, timeLimit: const Duration(seconds: 10));
-        setState(() { _currentLoc = LatLng(p.latitude, p.longitude); _pickupLoc = _currentLoc; _pickupCtrl.text = "Current Location"; _loading = false; });
-        _mapCtrl.move(_currentLoc, 15);
-      } else { setState(() => _loading = false); }
-    } catch (_) { setState(() => _loading = false); }
+        // First try last known position (instant)
+        Position? pos = await Geolocator.getLastKnownPosition();
+        if (pos != null && !_locationDone) {
+          setState(() { _currentLoc = LatLng(pos.latitude, pos.longitude); _pickupLoc = _currentLoc; _pickupCtrl.text = "Current Location"; _loading = false; _locationDone = true; });
+          _mapCtrl.move(_currentLoc!, 15);
+        }
+        // Then get precise GPS location (might take a few seconds)
+        pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+        if (pos != null && mounted) {
+          setState(() { _currentLoc = LatLng(pos.latitude, pos.longitude); _pickupLoc = _currentLoc; _pickupCtrl.text = "Current Location"; _loading = false; _locationDone = true; });
+          _mapCtrl.move(_currentLoc!, 15);
+        }
+      } else {
+        setState(() => _loading = false);
+      }
+    } catch (_) {
+      if (!_locationDone) setState(() => _loading = false);
+    }
   }
 
   Future<void> _searchPlaces(String q, bool isPickup) async {
@@ -213,7 +226,7 @@ class _HomePageState extends State<HomePage> {
     body: Stack(children: [
       _loading
         ? const Center(child: CircularProgressIndicator())
-        : FlutterMap(mapController: _mapCtrl, options: MapOptions(center: _currentLoc, zoom: 15, onLongPress: (tapPos, latlng) {
+        : FlutterMap(mapController: _mapCtrl, options: MapOptions(center: _currentLoc ?? const LatLng(0, 0), zoom: 15, onLongPress: (tapPos, latlng) {
             setState(() { if (_dropLoc == null) { _dropLoc = latlng; _dropCtrl.text = "Pinned"; } else { _pickupLoc = latlng; _pickupCtrl.text = "Pinned"; _dropLoc = null; _dropCtrl.clear(); } });
           }), children: [
             TileLayer(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", userAgentPackageName: "com.ziprick.customer"),
