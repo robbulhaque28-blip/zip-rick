@@ -64,7 +64,7 @@ class _SplashScreenState extends State<SplashScreen> {
 }
 
 // ═══════════════════════════════════════════════════
-// PAGE 1: LOGIN / REGISTRATION (Phone + Name → OTP)
+// PAGE 1: LOGIN / REGISTRATION with Toggle
 // ═══════════════════════════════════════════════════
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -75,60 +75,136 @@ class _LoginScreenState extends State<LoginScreen> {
   final _phoneCtrl = TextEditingController(text: '+91');
   final _nameCtrl = TextEditingController();
   final _otpCtrl = TextEditingController();
-  bool _loading = false; String _error = ''; bool _showOtp = false;
+  bool _loading = false, _showOtp = false;
+  bool _isRegister = true;
+  String _errorMsg = '';
 
   Future<void> _sendOtp() async {
-    if (_nameCtrl.text.trim().isEmpty) { setState(() => _error = 'Please enter your full name'); return; }
-    if (_phoneCtrl.text.trim().length < 10) { setState(() => _error = 'Valid phone number required'); return; }
-    setState(() { _loading = true; _error = ''; });
+    if (_isRegister && _nameCtrl.text.trim().isEmpty) {
+      setState(() => _errorMsg = 'Please enter your full name');
+      return;
+    }
+    if (_phoneCtrl.text.trim().length < 10) {
+      setState(() => _errorMsg = 'Valid phone number required');
+      return;
+    }
+    setState(() { _loading = true; _errorMsg = ''; });
     try {
       await ApiService.sendOtp(_phoneCtrl.text.trim());
       setState(() { _showOtp = true; _loading = false; });
-    } catch (e) { setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; }); }
+    } catch (e) {
+      setState(() { _errorMsg = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
+    }
   }
 
   Future<void> _verifyOtp() async {
-    if (_otpCtrl.text.trim().length < 4) { setState(() => _error = 'Enter OTP'); return; }
-    setState(() { _loading = true; _error = ''; });
+    if (_otpCtrl.text.trim().length < 4) { setState(() => _errorMsg = 'Enter OTP'); return; }
+    setState(() { _loading = true; _errorMsg = ''; });
     try {
-      final res = await ApiService.verifyOtp(_phoneCtrl.text.trim(), _otpCtrl.text.trim(), fullName: _nameCtrl.text.trim(), role: 'driver');
-      final data = res['data'];
-      if (data != null && data['tokens'] != null && data['tokens']['accessToken'] != null) {
-        await ApiService.saveToken(data['tokens']['accessToken']);
-        if (mounted) Navigator.pushReplacementNamed(context, '/register-docs');
-      } else { setState(() { _error = 'Registration failed'; _loading = false; }); }
-    } catch (e) { setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; }); }
+      if (_isRegister) {
+        // New registration: create account with name, go to docs
+        final res = await ApiService.verifyOtp(_phoneCtrl.text.trim(), _otpCtrl.text.trim(), fullName: _nameCtrl.text.trim(), role: 'driver');
+        final d = res['data'];
+        if (d != null && d['tokens'] != null && d['tokens']['accessToken'] != null) {
+          await ApiService.saveToken(d['tokens']['accessToken']);
+          if (mounted) Navigator.pushReplacementNamed(context, '/register-docs');
+        } else {
+          setState(() { _errorMsg = 'Registration failed'; _loading = false; });
+        }
+      } else {
+        // Existing user login: no name needed
+        try {
+          final res = await ApiService.verifyOtp(_phoneCtrl.text.trim(), _otpCtrl.text.trim(), role: 'driver');
+          final d = res['data'];
+          if (d != null && d['tokens'] != null && d['tokens']['accessToken'] != null) {
+            await ApiService.saveToken(d['tokens']['accessToken']);
+            if (mounted) Navigator.pushReplacementNamed(context, '/home');
+          } else {
+            setState(() { _errorMsg = 'Account not found. Please Register.'; _loading = false; });
+          }
+        } catch (_) {
+          setState(() { _errorMsg = 'Account not found. Please Register.'; _loading = false; });
+        }
+      }
+    } catch (e) {
+      setState(() { _errorMsg = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(body: SafeArea(
-      child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const SizedBox(height: 40),
+    return Scaffold(body: SafeArea(child: SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SizedBox(height: 30),
         const Icon(Icons.electric_rickshaw_rounded, size: 64, color: AppColors.primary),
         const SizedBox(height: 24),
-        Text(_showOtp ? 'Verify OTP' : 'Driver Registration', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+        // Toggle: Login / Register
+        if (!_showOtp)
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(children: [
+              Expanded(child: GestureDetector(
+                onTap: () => setState(() { _isRegister = false; _errorMsg = ''; }),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: _isRegister ? Colors.transparent : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text('Login', textAlign: TextAlign.center,
+                    style: TextStyle(fontWeight: FontWeight.bold,
+                      color: _isRegister ? AppColors.textLight : AppColors.primary)),
+                ),
+              )),
+              Expanded(child: GestureDetector(
+                onTap: () => setState(() { _isRegister = true; _errorMsg = ''; }),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: _isRegister ? Colors.white : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text('Register', textAlign: TextAlign.center,
+                    style: TextStyle(fontWeight: FontWeight.bold,
+                      color: _isRegister ? AppColors.primary : AppColors.textLight)),
+                ),
+              )),
+            ]),
+          ),
+        const SizedBox(height: 24),
+        Text(_showOtp ? 'Verify OTP' : (_isRegister ? 'Register as Driver' : 'Driver Login'),
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        Text(_showOtp ? 'Enter OTP sent to your phone' : 'Step 1 of 4: Enter your details', style: const TextStyle(color: AppColors.textLight, fontSize: 16)),
-        const SizedBox(height: 32),
-        if (!_showOtp) ...[
-          TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Full Name *', prefixIcon: Icon(Icons.person), border: OutlineInputBorder())),
+        Text(_showOtp ? 'Enter OTP sent to your phone' : (_isRegister ? 'Step 1 of 4' : 'Enter your phone to login'),
+          style: const TextStyle(color: AppColors.textLight, fontSize: 16)),
+        const SizedBox(height: 24),
+        // Name field - only for registration
+        if (!_showOtp && _isRegister) ...[
+          TextField(controller: _nameCtrl,
+            decoration: const InputDecoration(labelText: 'Full Name *', prefixIcon: Icon(Icons.person), border: OutlineInputBorder())),
           const SizedBox(height: 16),
         ],
-        TextField(controller: _phoneCtrl, enabled: !_showOtp, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone Number *', prefixIcon: Icon(Icons.phone_android), border: OutlineInputBorder())),
+        TextField(controller: _phoneCtrl, enabled: !_showOtp, keyboardType: TextInputType.phone,
+          decoration: const InputDecoration(labelText: 'Phone Number', prefixIcon: Icon(Icons.phone_android), border: OutlineInputBorder())),
         if (_showOtp) ...[
           const SizedBox(height: 16),
-          TextField(controller: _otpCtrl, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'OTP', prefixIcon: Icon(Icons.lock_outline), border: OutlineInputBorder())),
+          TextField(controller: _otpCtrl, keyboardType: TextInputType.number, maxLength: 6,
+            decoration: const InputDecoration(labelText: 'OTP', prefixIcon: Icon(Icons.lock_outline), border: OutlineInputBorder())),
         ],
-        if (_error.isNotEmpty) ...[const SizedBox(height: 12), Text(_error, style: const TextStyle(color: Colors.red))],
-        const SizedBox(height: 24),
+        if (_errorMsg.isNotEmpty) ...[const SizedBox(height: 12), Text(_errorMsg, style: const TextStyle(color: Colors.red))],
+        const SizedBox(height: 20),
         SizedBox(width: double.infinity, height: 52, child: ElevatedButton(
           onPressed: _loading ? null : (_showOtp ? _verifyOtp : _sendOtp),
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-          child: _loading ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Text(_showOtp ? 'Verify & Continue' : 'Send OTP', style: const TextStyle(fontSize: 16))),
-        ),
-      ])),
-    ));
+          child: _loading
+            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+            : Text(_showOtp ? 'Verify & Continue' : 'Send OTP', style: const TextStyle(fontSize: 16)))),
+      ]),
+    )));
   }
   @override
   void dispose() { _phoneCtrl.dispose(); _nameCtrl.dispose(); _otpCtrl.dispose(); super.dispose(); }
@@ -151,11 +227,6 @@ class _RegisterDocsScreenState extends State<RegisterDocsScreen> {
   final _acctNumCtrl = TextEditingController();
   final _ifscCtrl = TextEditingController();
 
-  Future<void> _pickImage(String key) async {
-    final x = await _picker.pickImage(source: ImageSource.camera, maxWidth: 1024);
-    if (x != null) setState(() => _docs[key] = x);
-  }
-
   String _label(String k) {
     switch (k) {
       case 'aadhaar_front': return 'Aadhaar Card (Front)';
@@ -166,7 +237,6 @@ class _RegisterDocsScreenState extends State<RegisterDocsScreen> {
       default: return k;
     }
   }
-
   IconData _icon(String k) {
     switch (k) {
       case 'aadhaar_front': return Icons.badge;
@@ -176,6 +246,11 @@ class _RegisterDocsScreenState extends State<RegisterDocsScreen> {
       case 'insurance': return Icons.verified;
       default: return Icons.upload_file;
     }
+  }
+
+  Future<void> _pickImage(String key) async {
+    final x = await _picker.pickImage(source: ImageSource.camera, maxWidth: 1024);
+    if (x != null) setState(() => _docs[key] = x);
   }
 
   Future<void> _submit() async {
@@ -189,13 +264,11 @@ class _RegisterDocsScreenState extends State<RegisterDocsScreen> {
     }
     setState(() => _loading = true);
     try {
-      // Upload each document
       for (final e in _docs.entries) {
         if (e.value != null) {
           try { await ApiService.post('/drivers/documents', {'document_type': e.key, 'document_url': e.value!.path}); } catch (_) {}
         }
       }
-      // Save bank details to profile
       try { await ApiService.updateProfile({'bank_name': _bankNameCtrl.text, 'account_holder': _acctHolderCtrl.text, 'account_number': _acctNumCtrl.text, 'ifsc_code': _ifscCtrl.text}); } catch (_) {}
       if (mounted) Navigator.pushReplacementNamed(context, '/terms');
     } catch (e) {
@@ -207,33 +280,34 @@ class _RegisterDocsScreenState extends State<RegisterDocsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-    appBar: AppBar(title: const Text('Upload Documents & Bank Details')),
-    body: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Step 2 of 4', style: TextStyle(color: AppColors.textLight, fontSize: 14)),
-      const Text('Documents', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 16),
-      ..._docs.keys.map((k) => Card(child: ListTile(
-        leading: Icon(_icon(k), color: AppColors.primary), title: Text(_label(k)),
-        subtitle: Text(_docs[k] != null ? '✓ Done' : 'Tap to take photo'),
-        trailing: Icon(_docs[k] != null ? Icons.check_circle : Icons.upload_file, color: _docs[k] != null ? AppColors.success : AppColors.textLight),
-        onTap: () => _pickImage(k),
-      ))),
-      const SizedBox(height: 24),
-      const Text('Bank Account Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 12),
-      TextField(controller: _bankNameCtrl, decoration: const InputDecoration(labelText: 'Bank Name *', border: OutlineInputBorder())),
-      const SizedBox(height: 12),
-      TextField(controller: _acctHolderCtrl, decoration: const InputDecoration(labelText: 'Account Holder Name *', border: OutlineInputBorder())),
-      const SizedBox(height: 12),
-      TextField(controller: _acctNumCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Account Number *', border: OutlineInputBorder())),
-      const SizedBox(height: 12),
-      TextField(controller: _ifscCtrl, decoration: const InputDecoration(labelText: 'IFSC Code *', border: OutlineInputBorder())),
-      const SizedBox(height: 24),
-      SizedBox(width: double.infinity, height: 52, child: ElevatedButton(
-        onPressed: _loading ? null : _submit,
-        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-        child: _loading ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Next: Terms & Conditions', style: TextStyle(fontSize: 16)))),
-    ])));
+      appBar: AppBar(title: const Text('Upload Documents & Bank Details')),
+      body: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Step 2 of 4', style: TextStyle(color: AppColors.textLight, fontSize: 14)),
+        const Text('Documents', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
+        ..._docs.keys.map((k) => Card(child: ListTile(
+          leading: Icon(_icon(k), color: AppColors.primary), title: Text(_label(k)),
+          subtitle: Text(_docs[k] != null ? 'Done' : 'Tap to take photo'),
+          trailing: Icon(_docs[k] != null ? Icons.check_circle : Icons.upload_file, color: _docs[k] != null ? AppColors.success : AppColors.textLight),
+          onTap: () => _pickImage(k),
+        ))),
+        const SizedBox(height: 24),
+        const Text('Bank Account Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        TextField(controller: _bankNameCtrl, decoration: const InputDecoration(labelText: 'Bank Name *', border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        TextField(controller: _acctHolderCtrl, decoration: const InputDecoration(labelText: 'Account Holder Name *', border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        TextField(controller: _acctNumCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Account Number *', border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        TextField(controller: _ifscCtrl, decoration: const InputDecoration(labelText: 'IFSC Code *', border: OutlineInputBorder())),
+        const SizedBox(height: 24),
+        SizedBox(width: double.infinity, height: 52, child: ElevatedButton(
+          onPressed: _loading ? null : _submit,
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+          child: _loading ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Next: Terms & Conditions', style: TextStyle(fontSize: 16)))),
+      ])),
+    );
   }
   @override
   void dispose() { _bankNameCtrl.dispose(); _acctHolderCtrl.dispose(); _acctNumCtrl.dispose(); _ifscCtrl.dispose(); super.dispose(); }
@@ -249,7 +323,6 @@ class TermsScreen extends StatefulWidget {
 }
 class _TermsScreenState extends State<TermsScreen> {
   bool _agreed = false;
-
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Terms & Conditions')),
@@ -257,27 +330,21 @@ class _TermsScreenState extends State<TermsScreen> {
       const Text('Step 3 of 4', style: TextStyle(color: AppColors.textLight, fontSize: 14)),
       const Text('Terms & Conditions', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
       const SizedBox(height: 20),
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
+      Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _t('1. Services'), _d('I agree to provide e-rickshaw ride services through the Zip-Rick platform.'),
           _t('2. Background Check'), _d('I authorize Zip-Rick to verify my documents and conduct a background check.'),
           _t('3. Commission'), _d('I agree to pay a commission of 10% on each ride fare to Zip-Rick.'),
           _t('4. Conduct'), _d('I will maintain professional conduct, keep my vehicle clean, and treat passengers with respect.'),
           _t('5. Cancellation'), _d('I understand that excessive cancellations may result in account suspension.'),
-          _t('6. Fees'), _d('The registration fee of ₹499 is non-refundable.'),
+          _t('6. Fees'), _d('The registration fee of 499 is non-refundable.'),
           _t('7. Compliance'), _d('I will comply with all local traffic rules and regulations.'),
           _t('8. Data'), _d('I consent to Zip-Rick collecting my location data for ride tracking purposes.'),
-        ]),
-      ),
+        ])),
       const SizedBox(height: 20),
-      CheckboxListTile(
-        value: _agreed, dense: true,
-        onChanged: (v) => setState(() => _agreed = v ?? false),
+      CheckboxListTile(value: _agreed, dense: true, onChanged: (v) => setState(() => _agreed = v ?? false),
         title: const Text('I have read and agree to all the terms and conditions above', style: TextStyle(fontSize: 14)),
-        controlAffinity: ListTileControlAffinity.leading,
-      ),
+        controlAffinity: ListTileControlAffinity.leading),
       const SizedBox(height: 12),
       SizedBox(width: double.infinity, height: 52, child: ElevatedButton(
         onPressed: _agreed ? () => Navigator.pushReplacementNamed(context, '/payment') : null,
@@ -289,7 +356,7 @@ class _TermsScreenState extends State<TermsScreen> {
 }
 
 // ═══════════════════════════════════════════════════
-// PAGE 4: PAYMENT (₹499 Registration Fee)
+// PAGE 4: PAYMENT
 // ═══════════════════════════════════════════════════
 class PaymentScreen extends StatefulWidget {
   const PaymentScreen({super.key});
@@ -297,9 +364,7 @@ class PaymentScreen extends StatefulWidget {
   State<PaymentScreen> createState() => _PaymentScreenState();
 }
 class _PaymentScreenState extends State<PaymentScreen> {
-  bool _loading = false;
-  bool _success = false;
-
+  bool _loading = false, _success = false;
   Future<void> _pay() async {
     setState(() => _loading = true);
     try {
@@ -312,48 +377,36 @@ class _PaymentScreenState extends State<PaymentScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Payment failed: ${e.toString().replaceFirst("Exception: ", "")}')));
     }
   }
-
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Registration Fee')),
     body: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       const Text('Step 4 of 4', style: TextStyle(color: AppColors.textLight, fontSize: 14)),
       const SizedBox(height: 24),
-      Container(
-        width: 100, height: 100,
-        decoration: BoxDecoration(color: _success ? AppColors.success.withOpacity(0.1) : AppColors.primary.withOpacity(0.1), shape: BoxShape.circle),
+      Container(width: 100, height: 100, decoration: BoxDecoration(color: (_success ? AppColors.success : AppColors.primary).withOpacity(0.1), shape: BoxShape.circle),
         child: Icon(_success ? Icons.check_circle : Icons.payment, size: 48, color: _success ? AppColors.success : AppColors.primary)),
       const SizedBox(height: 24),
       const Text('One-Time Registration Fee', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
       const SizedBox(height: 8),
-      const Text('Pay ₹499 to complete your registration', style: TextStyle(color: AppColors.textLight, fontSize: 16)),
+      const Text('Pay 499 to complete your registration', style: TextStyle(color: AppColors.textLight, fontSize: 16)),
       const SizedBox(height: 32),
-      Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
+      Container(padding: const EdgeInsets.all(24), decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
         child: Column(children: [
-          const Text('Amount Due', style: TextStyle(color: AppColors.textLight, fontSize: 14)),
-          const SizedBox(height: 8),
-          const Text('₹499', style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: AppColors.primary)),
+          const Text('Amount Due', style: TextStyle(color: AppColors.textLight, fontSize: 14)), const SizedBox(height: 8),
+          const Text('499', style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: AppColors.primary)),
           const Divider(height: 32),
-          _r('Registration Fee', '₹499'),
-          _r('GST (18%)', '₹0'),
-          _r('Total', '₹499', bold: true),
+          _r('Registration Fee', '499'), _r('Total', '499', bold: true),
         ])),
       const SizedBox(height: 32),
       if (_success)
-        const Column(children: [
-          Icon(Icons.check_circle, size: 64, color: AppColors.success),
-          SizedBox(height: 12),
-          Text('Payment Successful!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.success)),
-        ])
+        const Column(children: [Icon(Icons.check_circle, size: 64, color: AppColors.success), SizedBox(height: 12),
+          Text('Payment Successful!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.success))])
       else
         SizedBox(width: double.infinity, height: 52, child: ElevatedButton.icon(
           onPressed: _loading ? null : _pay,
           icon: _loading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.payment),
-          label: Text(_loading ? 'Processing...' : 'Pay ₹499 Now', style: const TextStyle(fontSize: 16)),
-          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
-      ),
+          label: Text(_loading ? 'Processing...' : 'Pay 499 Now', style: const TextStyle(fontSize: 16)),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
     ]))));
   Widget _r(String l, String v, {bool bold = false}) => Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
     Text(l, style: TextStyle(color: AppColors.textLight, fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
@@ -541,10 +594,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
         child: _currentPosition != null ? FlutterMap(options: MapOptions(center: LatLng(_currentPosition!.latitude, _currentPosition!.longitude), zoom: 15), children: [
           TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.ziprick.driver'),
           MarkerLayer(markers: [Marker(point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude), width: 80, height: 80, child: Icon(Icons.electric_rickshaw_rounded, size: 48, color: _isOnline ? AppColors.success : AppColors.textLight))]),
-        ]) : const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [CircularProgressIndicator(), SizedBox(height: 12), Text('Fetching location...')])))),
+        ]) : const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [CircularProgressIndicator(), SizedBox(height: 12), Text('Fetching location...')]))),
       const SizedBox(height: 12),
-      Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: SizedBox(width: double.infinity, height: 48, child: ElevatedButton.icon(onPressed: _fetchLocation, icon: const Icon(Icons.my_location), label: const Text('Refresh Location'), style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))))),
-      const SizedBox(height: 12),
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: SizedBox(width: double.infinity, height: 48, child: ElevatedButton.icon(onPressed: _fetchLocation, icon: const Icon(Icons.my_location), label: const Text('Refresh Location'), style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))))),
     ]);
   }
 
@@ -560,7 +612,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       Container(width: double.infinity, padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: sc.withOpacity(0.1), borderRadius: BorderRadius.circular(16), border: Border.all(color: sc.withOpacity(0.3))),
         child: Row(children: [Icon(Icons.info_outline, color: sc, size: 32), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Status: $st', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: sc)),
-          Text('Fare: ₹${r['total_fare'] ?? '--'}', style: const TextStyle(fontSize: 14, color: AppColors.textLight)),
+          Text('Fare: ${r['total_fare'] ?? '--'}', style: const TextStyle(fontSize: 14, color: AppColors.textLight)),
         ]))])),
       const SizedBox(height: 16),
       Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
@@ -569,10 +621,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
         Row(children: [const Icon(Icons.location_on, color: Colors.red, size: 24), const SizedBox(width: 12), Expanded(child: Text(r['drop_address'] ?? 'Drop'))]),
       ]))),
       const SizedBox(height: 16),
-      if (status == 'driver_assigned') _btn('I\'ve Arrived', Icons.check_circle, AppColors.warning, () => _updateStatus('ride:arrived')),
+      if (status == 'driver_assigned') _btn('Arrived', Icons.check_circle, AppColors.warning, () => _updateStatus('ride:arrived')),
       if (status == 'driver_arrived') _btn('Start Ride', Icons.play_arrow, AppColors.success, () => _updateStatus('ride:start')),
       if (status == 'started') _btn('Complete Ride', Icons.stop_circle, AppColors.primary, () => _updateStatus('ride:complete')),
-      if (status == 'completed') _btn('Back to Home', Icons.home, AppColors.primary, () => setState(() { _hasActiveRide = false; _activeRide = null; })),
+      if (status == 'completed') _btn('Done', Icons.home, AppColors.success, () => setState(() { _hasActiveRide = false; _activeRide = null; })),
       const SizedBox(height: 12),
       SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _callCustomer, icon: const Icon(Icons.phone), label: const Text('Call Customer'), style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
     ]));
@@ -593,7 +645,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
           const SizedBox(height: 6),
           Row(children: [const Icon(Icons.location_on, color: Colors.red, size: 20), const SizedBox(width: 8), Expanded(child: Text(r['drop_address'] ?? 'Drop', style: const TextStyle(fontSize: 15)))]),
           const SizedBox(height: 12),
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Text('Fare: ', style: TextStyle(fontSize: 18)), Text('₹${r['total_fare'] ?? '--'}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary))]),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Text('Fare: ', style: TextStyle(fontSize: 18)), Text('${r['total_fare'] ?? '--'}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary))]),
           const SizedBox(height: 16),
           Row(children: [
             Expanded(child: ElevatedButton.icon(onPressed: _acceptRide, icon: const Icon(Icons.check_circle), label: const Text('Accept'), style: ElevatedButton.styleFrom(backgroundColor: AppColors.success, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
@@ -610,16 +662,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       if (s.hasError) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.error_outline, size: 48, color: Colors.red), const SizedBox(height: 12), const Text('Could not load earnings'), ElevatedButton(onPressed: () => setState(() {}), child: const Text('Retry'))]));
       final d = s.data?['data'] ?? {};
       return SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Earnings', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 20),
+        const Text('Earnings', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)), const SizedBox(height: 20),
         Container(width: double.infinity, padding: const EdgeInsets.all(24), decoration: BoxDecoration(gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]), borderRadius: BorderRadius.circular(16)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Total Earnings', style: TextStyle(color: Colors.white70, fontSize: 14)), const SizedBox(height: 8),
-            Text('₹${d['total_earnings'] ?? '0'}', style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)),
+            Text('${d['total_earnings'] ?? '0'}', style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8), Text('${d['total_rides'] ?? '0'} rides', style: const TextStyle(color: Colors.white70)),
           ])),
         const SizedBox(height: 20),
-        Row(children: [Expanded(child: _ec('Today', '₹${d['today_earnings'] ?? '0'}', Icons.today, AppColors.success)), const SizedBox(width: 12), Expanded(child: _ec('Week', '₹${d['week_earnings'] ?? '0'}', Icons.date_range, AppColors.warning))]),
+        Row(children: [Expanded(child: _ec('Today', '${d['today_earnings'] ?? '0'}', Icons.today, AppColors.success)), const SizedBox(width: 12), Expanded(child: _ec('Week', '${d['week_earnings'] ?? '0'}', Icons.date_range, AppColors.warning))]),
       ]));
     },
   );
@@ -652,14 +703,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
         _ds('Insurance', docStatus['insurance'] == true),
       ])),
       if (v != null) ...[const SizedBox(height: 16), const Text('Vehicle', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 8),
-        Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(children: [
-          _ir('Number', v['vehicle_number']?.toString() ?? 'N/A'), _ir('Model', v['vehicle_model']?.toString() ?? 'N/A'),
-        ]))),
+        Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(children: [_ir('Number', v['vehicle_number']?.toString() ?? 'N/A'), _ir('Model', v['vehicle_model']?.toString() ?? 'N/A')]))),
       ],
       if ((_driverProfile?['total_ratings'] ?? 0) > 0) ...[const SizedBox(height: 16), const Text('Ratings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 8),
-        Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(children: [
-          _ir('Average', '${_driverProfile?['rating_avg'] ?? '0.0'}'), _ir('Total', '${_driverProfile?['total_ratings'] ?? '0'}'),
-        ]))),
+        Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(children: [_ir('Average', '${_driverProfile?['rating_avg'] ?? '0.0'}'), _ir('Total', '${_driverProfile?['total_ratings'] ?? '0'}')]))),
       ],
       const SizedBox(height: 24),
       SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _logout, icon: const Icon(Icons.logout, color: Colors.red), label: const Text('Logout', style: TextStyle(color: Colors.red)),
