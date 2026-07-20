@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, Card, CardContent, TextField, Button, Grid, Switch, FormControlLabel } from '@mui/material';
 
 const API = 'https://zip-rick-4.onrender.com/api/v1';
 
@@ -39,30 +40,35 @@ export default function SettingsPage() {
   };
 
   return (
-    <div style={{ padding: 24, fontFamily: 'sans-serif' }}>
-      <h1>System Settings</h1>
-      {msg && <div style={{ padding: 8, background: '#E8F5E9', borderRadius: 8, marginBottom: 12, color: '#2E7D32' }}>{msg}</div>}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
-        <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-          <h3>Fare Rates</h3>
-          <label>Base Fare (Rs): <input type="number" value={fare.base_fare} onChange={e => setFare({...fare, base_fare: e.target.value})} style={{ width: '100%', padding: 8, margin: '8px 0', borderRadius: 4, border: '1px solid #ccc' }} /></label>
-          <label>Per KM (Rs): <input type="number" value={fare.per_km} onChange={e => setFare({...fare, per_km: e.target.value})} style={{ width: '100%', padding: 8, margin: '8px 0', borderRadius: 4, border: '1px solid #ccc' }} /></label>
-          <label>Per Minute (Rs): <input type="number" value={fare.per_minute} onChange={e => setFare({...fare, per_minute: e.target.value})} style={{ width: '100%', padding: 8, margin: '8px 0', borderRadius: 4, border: '1px solid #ccc' }} /></label>
-          <label>Min Fare (Rs): <input type="number" value={fare.minimum_fare} onChange={e => setFare({...fare, minimum_fare: e.target.value})} style={{ width: '100%', padding: 8, margin: '8px 0', borderRadius: 4, border: '1px solid #ccc' }} /></label>
-          <button onClick={saveFare} style={{ padding: '10px 20px', background: '#6C63FF', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', marginTop: 12 }}>Save Fare</button>
-        </div>
-        <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-          <h3>Registration Fee</h3>
-          <label>Standard Fee (Rs): <input type="number" value={fee.standard} onChange={e => setFee({...fee, standard: parseFloat(e.target.value) || 999})} style={{ width: '100%', padding: 8, margin: '8px 0', borderRadius: 4, border: '1px solid #ccc' }} /></label>
-          <label>Promotional Fee (Rs): <input type="number" value={fee.promotional} onChange={e => setFee({...fee, promotional: parseFloat(e.target.value) || 499})} style={{ width: '100%', padding: 8, margin: '8px 0', borderRadius: 4, border: '1px solid #ccc' }} /></label>
-          <label><input type="checkbox" checked={fee.promotion_active} onChange={e => setFee({...fee, promotion_active: e.target.checked})} /> Promotion Active</label>
-          <button onClick={saveFee} style={{ padding: '10px 20px', background: '#6C63FF', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', marginTop: 12, display: 'block' }}>Save Fee</button>
-          <hr style={{ margin: '16px 0' }} />
-          <h3>Commission</h3>
-          <label>Rate (%): <input type="number" value={commission.rate} onChange={e => setCommission({...commission, rate: parseFloat(e.target.value) || 10})} style={{ width: '100%', padding: 8, margin: '8px 0', borderRadius: 4, border: '1px solid #ccc' }} /></label>
-          <button onClick={saveCommission} style={{ padding: '10px 20px', background: '#6C63FF', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', marginTop: 12 }}>Save Commission</button>
-        </div>
-      </div>
-    </div>
+    <Box>
+      <Typography variant="h4" sx={{ fontWeight: 700, mb: 3 }}>System Settings</Typography>
+      {msg && <Typography sx={{ p: 1.5, bgcolor: '#E8F5E9', borderRadius: 2, mb: 2, color: '#2E7D32' }}>{msg}</Typography>}
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <Card><CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>Fare Rates</Typography>
+            <TextField label="Base Fare (₹)" type="number" value={fare.base_fare} onChange={e => setFare({...fare, base_fare: e.target.value})} />
+            <TextField label="Per KM (₹)" type="number" value={fare.per_km} onChange={e => setFare({...fare, per_km: e.target.value})} />
+            <TextField label="Per Minute (₹)" type="number" value={fare.per_minute} onChange={e => setFare({...fare, per_minute: e.target.value})} />
+            <TextField label="Min Fare (₹)" type="number" value={fare.minimum_fare} onChange={e => setFare({...fare, minimum_fare: e.target.value})} />
+            <Button variant="contained" onClick={saveFare} sx={{ alignSelf: 'flex-start' }}>Save Fare</Button>
+          </CardContent></Card>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Card><CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>Registration Fee</Typography>
+            <TextField label="Standard (₹)" type="number" value={fee.standard} onChange={e => setFee({...fee, standard: parseFloat(e.target.value) || 999})} />
+            <TextField label="Promotional (₹)" type="number" value={fee.promotional} onChange={e => setFee({...fee, promotional: parseFloat(e.target.value) || 499})} />
+            <FormControlLabel control={<Switch checked={fee.promotion_active} onChange={e => setFee({...fee, promotion_active: e.target.checked})} />} label="Promotion Active" />
+            <Button variant="contained" onClick={saveFee} sx={{ alignSelf: 'flex-start' }}>Save Fee</Button>
+            <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #eee' }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Commission</Typography>
+              <TextField label="Rate (%)" type="number" value={commission.rate} onChange={e => setCommission({...commission, rate: parseFloat(e.target.value) || 10})} />
+              <Button variant="contained" onClick={saveCommission} sx={{ alignSelf: 'flex-start', mt: 2 }}>Save Commission</Button>
+            </Box>
+          </CardContent></Card>
+        </Grid>
+      </Grid>
+    </Box>
   );
 }

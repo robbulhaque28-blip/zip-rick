@@ -1,22 +1,30 @@
 import React, { useState, useEffect } from 'react';
+import { Box, Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Badge } from '@mui/material';
+import { Warning } from '@mui/icons-material';
 
 const API = 'https://zip-rick-4.onrender.com/api/v1';
 
 export default function SupportPage() {
   const [tickets, setTickets] = useState([]);
+  const [filter, setFilter] = useState('');
 
   useEffect(() => {
     const load = async () => {
       try {
         const token = localStorage.getItem('admin_token');
         if (!token) return;
-        const res = await fetch(API + '/admin/support-tickets', { headers: { Authorization: 'Bearer ' + token } });
+        let url = API + '/admin/support-tickets';
+        if (filter) url += '?status=' + filter;
+        const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+        if (res.status === 401) { localStorage.removeItem('admin_token'); window.location.href = '/login'; return; }
         const data = await res.json();
         if (data.success && data.data && data.data.tickets) setTickets(data.data.tickets);
       } catch (e) {}
     };
     load();
-  }, []);
+    const t = setInterval(load, 15000);
+    return () => clearInterval(t);
+  }, [filter]);
 
   const updateStatus = async (id, status) => {
     try {
@@ -30,45 +38,58 @@ export default function SupportPage() {
     } catch (e) {}
   };
 
+  const sosCount = tickets.filter(t => t.priority === 'urgent' && t.status === 'open').length;
+
   return (
-    <div style={{ padding: 24, fontFamily: 'sans-serif' }}>
-      <h1>Support Tickets</h1>
-      <p style={{ color: '#666', marginBottom: 16 }}>Total: {tickets.length} ticket(s)</p>
-      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-        <thead>
-          <tr style={{ background: '#f5f5f5', textAlign: 'left' }}>
-            <th style={{ padding: 12 }}>User</th>
-            <th style={{ padding: 12 }}>Subject</th>
-            <th style={{ padding: 12 }}>Status</th>
-            <th style={{ padding: 12 }}>Priority</th>
-            <th style={{ padding: 12 }}>Date</th>
-            <th style={{ padding: 12 }}>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tickets.length === 0 && <tr><td colSpan="6" style={{ padding: 24, textAlign: 'center', color: '#999' }}>No tickets yet.</td></tr>}
-          {tickets.map(t => (
-            <tr key={t.id} style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: 12 }}>{t.user?.full_name || 'N/A'}<br/><small>{t.user?.phone || ''}</small></td>
-              <td style={{ padding: 12 }}>{t.subject}</td>
-              <td style={{ padding: 12 }}>
-                <span style={{ color: t.status === 'open' ? 'orange' : t.status === 'resolved' ? 'green' : 'blue', fontWeight: 'bold' }}>{t.status}</span>
-              </td>
-              <td style={{ padding: 12 }}>
-                <span style={{ color: t.priority === 'urgent' ? 'red' : t.priority === 'high' ? 'orange' : 'blue' }}>{t.priority}</span>
-              </td>
-              <td style={{ padding: 12 }}>{new Date(t.created_at).toLocaleDateString()}</td>
-              <td style={{ padding: 12 }}>
-                {t.status === 'open' && (
-                  <button onClick={() => updateStatus(t.id, 'resolved')} style={{ padding: '4px 12px', background: 'green', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                    Resolve
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Box>
+      <Typography variant="h4" sx={{ fontWeight: 700, mb: 2 }}>
+        Support Tickets
+        {sosCount > 0 && <Chip label={`${sosCount} SOS`} color="error" size="small" icon={<Warning />} sx={{ ml: 2 }} />}
+      </Typography>
+      <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+        {['','open','resolved','closed'].map(f => (
+          <Button key={f} size="small" variant={filter === f ? 'contained' : 'outlined'} onClick={() => setFilter(f)}
+            color={f === '' && sosCount > 0 ? 'error' : 'primary'}>
+            {f || 'All'}
+          </Button>
+        ))}
+      </Box>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{tickets.length} ticket(s)</Typography>
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead><TableRow sx={{ bgcolor: '#f5f5f5' }}>
+            <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Subject</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Priority</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+          </TableRow></TableHead>
+          <TableBody>
+            {tickets.length === 0 && <TableRow><TableCell colSpan={6} sx={{ textAlign: 'center', py: 4, color: '#999' }}>No tickets</TableCell></TableRow>}
+            {tickets.map(t => (
+              <TableRow key={t.id} sx={{ bgcolor: t.priority === 'urgent' ? '#FFF0F0' : 'inherit' }}>
+                <TableCell>
+                  {t.priority === 'urgent' && <Badge color="error" variant="dot" sx={{ mr: 1 }} />}
+                  {t.user?.full_name || 'N/A'}<br /><Typography variant="caption" color="text.secondary">{t.user?.phone || ''}</Typography>
+                </TableCell>
+                <TableCell sx={{ fontWeight: t.priority === 'urgent' ? 600 : 400 }}>{t.subject}</TableCell>
+                <TableCell><Chip label={t.status} size="small" color={t.status === 'open' ? 'warning' : t.status === 'resolved' ? 'success' : 'default'} /></TableCell>
+                <TableCell><Chip label={t.priority} size="small" color={t.priority === 'urgent' ? 'error' : t.priority === 'high' ? 'warning' : 'info'} /></TableCell>
+                <TableCell>{t.created_at ? new Date(t.created_at).toLocaleString() : ''}</TableCell>
+                <TableCell>
+                  {t.status === 'open' && (
+                    <Button size="small" color="success" variant="contained" onClick={() => updateStatus(t.id, 'resolved')} sx={{ mr: 0.5 }}>
+                      Resolve
+                    </Button>
+                  )}
+                  {t.status === 'resolved' && <Button size="small" onClick={() => updateStatus(t.id, 'open')}>Reopen</Button>}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Box>
   );
 }

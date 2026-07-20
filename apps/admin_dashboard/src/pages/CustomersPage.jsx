@@ -1,50 +1,62 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TextField, InputAdornment } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import { Search } from '@mui/icons-material';
 
 const API = 'https://zip-rick-4.onrender.com/api/v1';
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState([]);
+  const [search, setSearch] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     const load = async () => {
       try {
         const token = localStorage.getItem('admin_token');
         if (!token) return;
-        const res = await fetch(API + '/admin/customers?limit=100', { headers: { Authorization: 'Bearer ' + token } });
+        let url = API + '/admin/customers?limit=100';
+        if (search) url += '&search=' + encodeURIComponent(search);
+        const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+        if (res.status === 401) { localStorage.removeItem('admin_token'); window.location.href = '/login'; return; }
         const data = await res.json();
         if (data.success && Array.isArray(data.data)) setCustomers(data.data);
       } catch (e) {}
     };
     load();
-  }, []);
+  }, [search]);
 
   return (
-    <div style={{ padding: 24, fontFamily: 'sans-serif' }}>
-      <h1>Customer Management</h1>
-      <p style={{ color: '#666', marginBottom: 16 }}>Total: {customers.length} customer(s)</p>
-      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-        <thead>
-          <tr style={{ background: '#f5f5f5', textAlign: 'left' }}>
-            <th style={{ padding: 12 }}>Name</th>
-            <th style={{ padding: 12 }}>Phone</th>
-            <th style={{ padding: 12 }}>Rides</th>
-            <th style={{ padding: 12 }}>Spent</th>
-            <th style={{ padding: 12 }}>Rating</th>
-          </tr>
-        </thead>
-        <tbody>
-          {customers.length === 0 && <tr><td colSpan="5" style={{ padding: 24, textAlign: 'center', color: '#999' }}>No customers yet. Ask users to register!</td></tr>}
-          {customers.map(c => (
-            <tr key={c.id} style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: 12 }}>{c.user ? c.user.full_name : 'N/A'}</td>
-              <td style={{ padding: 12 }}>{c.user ? c.user.phone : 'N/A'}</td>
-              <td style={{ padding: 12 }}>{c.total_rides || 0}</td>
-              <td style={{ padding: 12 }}>Rs {c.total_spent || 0}</td>
-              <td style={{ padding: 12 }}>{c.rating || '0.0'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Box>
+      <Typography variant="h4" sx={{ fontWeight: 700, mb: 2 }}>Customer Management</Typography>
+      <TextField size="small" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)}
+        InputProps={{ startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> }} sx={{ mb: 2, minWidth: 250 }} />
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{customers.length} customer(s)</Typography>
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead><TableRow sx={{ bgcolor: '#f5f5f5' }}>
+            <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Phone</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Rides</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Spent</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Rating</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Joined</TableCell>
+          </TableRow></TableHead>
+          <TableBody>
+            {customers.length === 0 && <TableRow><TableCell colSpan={6} sx={{ textAlign: 'center', py: 4, color: '#999' }}>No customers yet</TableCell></TableRow>}
+            {customers.map(c => (
+              <TableRow key={c.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate('/customers/' + c.id)}>
+                <TableCell>{c.user ? c.user.full_name : 'N/A'}</TableCell>
+                <TableCell>{c.user ? c.user.phone : 'N/A'}</TableCell>
+                <TableCell>{c.total_rides || 0}</TableCell>
+                <TableCell>₹{c.total_spent || 0}</TableCell>
+                <TableCell>{c.rating || '0.0'}</TableCell>
+                <TableCell>{c.created_at ? new Date(c.created_at).toLocaleDateString() : 'N/A'}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Box>
   );
 }

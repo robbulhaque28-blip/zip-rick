@@ -1,4 +1,4 @@
-﻿const router = require('express').Router();
+const router = require('express').Router();
 const { authenticate, authorize } = require('../middleware/auth');
 const { asyncHandler, ApiError } = require('../middleware/errorHandler');
 const { success, paginated } = require('../utils/response');
@@ -11,56 +11,51 @@ router.use(authorize('admin'));
 router.get('/dashboard', asyncHandler(async (req, res) => {
   try {
     const today = new Date(); today.setHours(0,0,0,0);
-    const month = new Date(today.getFullYear(), today.getMonth(), 1);
-    const [tc, td, pd, tr, ar] = await Promise.all([
+    const [tc, td, pd, tr, ar, od, of, os] = await Promise.all([
       Customer.count(),
       Driver.count(),
       Driver.count({ where: { registration_status: 'pending' } }),
       Ride.count(),
-      Ride.count({ where: { status: { [Op.in]: ['searching','driver_assigned','driver_arrived','started'] } } })
+      Ride.count({ where: { status: { [Op.in]: ['searching','driver_assigned','driver_arrived','started'] } } }),
+      Driver.count({ where: { is_online: true, is_available: true, registration_status: 'approved' } }),
+      Driver.count({ where: { is_online: false, registration_status: 'approved' } }),
+      Driver.count({ where: { is_online: true, is_available: false } }),
     ]);
     
-    // Fix: Check if payment_status column exists first
     let trev = 0;
     let trevToday = 0;
     try {
       trev = await Payment.sum('amount', { where: { payment_status: 'completed' } }) || 0;
       trevToday = await Payment.sum('amount', { where: { payment_status: 'completed', paid_at: { [Op.gte]: today } } }) || 0;
     } catch (e) {
-      // Fallback if payment_status doesn't exist
       trev = await Payment.sum('amount') || 0;
-      const allPaymentsToday = await Payment.findAll({ where: { created_at: { [Op.gte]: today } }, attributes: ['amount'] });
-      trevToday = allPaymentsToday.reduce((s, p) => s + parseFloat(p.amount || 0), 0);
+      trevToday = 0;
     }
     
     const todayRides = await Ride.count({ where: { created_at: { [Op.gte]: today } } });
+    const revenueData = await Payment.findAll({
+      where: { created_at: { [Op.gte]: new Date(Date.now() - 30*24*60*60*1000) } },
+      attributes: [[literal('DATE(created_at)'),'date'],[literal('SUM(amount)'),'total_revenue']],
+      group: [literal('DATE(created_at)')], order: [[literal('DATE(created_at)'),'ASC']], raw: true
+    });
     
     return success(res, {
       overview: {
-        total_customers: tc || 0,
-        total_drivers: td || 0,
-        pending_drivers: pd || 0,
-        total_rides: tr || 0,
-        active_rides: ar || 0,
-        today_rides: todayRides || 0,
-        revenue: {
-          total: trev,
-          today: trevToday,
-        },
+        total_customers: tc || 0, total_drivers: td || 0, pending_drivers: pd || 0,
+        total_rides: tr || 0, active_rides: ar || 0, today_rides: todayRides || 0,
+        online_drivers: od || 0, offline_drivers: of || 0, on_ride_drivers: os || 0,
+        revenue: { total: trev, today: trevToday },
+        revenue_chart: revenueData,
       },
     });
   } catch (e) {
     console.log('Dashboard error:', e.message);
-    return success(res, {
-      overview: {
-        total_customers: await Customer.count() || 0,
-        total_drivers: await Driver.count() || 0,
-        pending_drivers: 0,
-        total_rides: 0,
-        active_rides: 0,
-        revenue: { total: 0, today: 0 },
-      },
-    });
+    return success(res, { overview: {
+      total_customers: await Customer.count() || 0, total_drivers: await Driver.count() || 0,
+      pending_drivers: 0, total_rides: 0, active_rides: 0, today_rides: 0,
+      online_drivers: 0, offline_drivers: 0, on_ride_drivers: 0,
+      revenue: { total: 0, today: 0 }, revenue_chart: [],
+    }});
   }
 }));
 
@@ -139,6 +134,24 @@ router.get('/customers', asyncHandler(async (req, res) => {
     offset: (page-1)*limit, limit
   });
   return paginated(res, rows, count, page, limit);
+}));
+
+router.get('/customers/:id', asyncHandler(async (req, res) => {
+  const c = await Customer.findByPk(req.params.id, {
+    include: [{ association: 'user', attributes: ['id','full_name','phone','email','is_active','created_at'] }],
+  });
+  if (!c) throw new ApiError(404, 'Not found');
+  const rides = await Ride.findAll({ where: { customer_id: c.id }, limit: 50, order: [['created_at','DESC']],
+    include: [{ association: 'driver', include: [{ association: 'user', attributes: ['full_name'] }] }] });
+  return success(res, { customer: c, rides });
+}));
+
+router.get('/drivers/:id/rides', asyncHandler(async (req, res) => {
+  const d = await Driver.findByPk(req.params.id);
+  if (!d) throw new ApiError(404);
+  const rides = await Ride.findAll({ where: { driver_id: d.id }, limit: 50, order: [['created_at','DESC']],
+    include: [{ association: 'customer', include: [{ association: 'user', attributes: ['full_name'] }] }] });
+  return success(res, { rides });
 }));
 
 router.get('/rides', asyncHandler(async (req, res) => {

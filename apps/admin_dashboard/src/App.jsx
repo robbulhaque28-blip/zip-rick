@@ -1,14 +1,18 @@
-﻿import React from 'react';
+import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
-import { ThemeProvider, createTheme, CssBaseline, AppBar, Toolbar, Typography, Drawer, List, ListItem, ListItemIcon, ListItemText, Box, Button } from '@mui/material';
-import { Dashboard, PeopleAlt, DirectionsCar, Settings, SupportAgent } from '@mui/icons-material';
+import { ThemeProvider, createTheme, CssBaseline, AppBar, Toolbar, Typography, Drawer, List, ListItem, ListItemIcon, ListItemText, Box, Button, Badge } from '@mui/material';
+import { Dashboard, PeopleAlt, DirectionsCar, Settings, SupportAgent, MonetizationOn, Notifications, CardGiftcard } from '@mui/icons-material';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import DriversPage from './pages/DriversPage';
+import DriverDetailPage from './pages/DriverDetailPage';
 import CustomersPage from './pages/CustomersPage';
+import CustomerDetailPage from './pages/CustomerDetailPage';
 import RidesPage from './pages/RidesPage';
-import SettingsPage from './pages/SettingsPage';
 import SupportPage from './pages/SupportPage';
+import SettingsPage from './pages/SettingsPage';
+import PromoCodesPage from './pages/PromoCodesPage';
+import NotificationsPage from './pages/NotificationsPage';
 
 const theme = createTheme({
   palette: { primary: { main: '#6C63FF' }, secondary: { main: '#00D9A6' }, background: { default: '#F5F6FA' } },
@@ -26,14 +30,16 @@ function Layout() {
     { text: 'Drivers', icon: <PeopleAlt />, path: '/drivers' },
     { text: 'Customers', icon: <PeopleAlt />, path: '/customers' },
     { text: 'Rides', icon: <DirectionsCar />, path: '/rides' },
-    { text: 'Support', icon: <SupportAgent />, path: '/support' },
+    { text: 'Support', icon: <Badge badgeContent="!" color="error"><SupportAgent /></Badge>, path: '/support' },
+    { text: 'Promo Codes', icon: <CardGiftcard />, path: '/promo-codes' },
+    { text: 'Notifications', icon: <Notifications />, path: '/notifications' },
     { text: 'Settings', icon: <Settings />, path: '/settings' },
   ];
   return (
     <Box sx={{ display: 'flex' }}>
       <AppBar position="fixed" sx={{ zIndex: 1201, backgroundColor: '#1A1D26' }}>
         <Toolbar>
-          <Typography variant="h6" noWrap sx={{ flexGrow: 1 }}>Zip-Rick Admin</Typography>
+          <Typography variant="h6" noWrap sx={{ flexGrow: 1, fontWeight: 700 }}>Zip-Rick Admin</Typography>
           <Button color="inherit" onClick={() => { localStorage.removeItem('admin_token'); window.location.href = '/login'; }}>Logout</Button>
         </Toolbar>
       </AppBar>
@@ -52,9 +58,13 @@ function Layout() {
         <Routes>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/drivers" element={<DriversPage />} />
+          <Route path="/drivers/:id" element={<DriverDetailPage />} />
           <Route path="/customers" element={<CustomersPage />} />
+          <Route path="/customers/:id" element={<CustomerDetailPage />} />
           <Route path="/rides" element={<RidesPage />} />
           <Route path="/support" element={<SupportPage />} />
+          <Route path="/promo-codes" element={<PromoCodesPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/dashboard" />} />
         </Routes>
