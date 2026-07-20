@@ -173,7 +173,7 @@ module.exports = {
       const dLng = (parseFloat(ride.pickup_longitude) - driverLng) * Math.PI / 180;
       const a = Math.sin(dLat/2)**2 + Math.cos(driverLat*Math.PI/180) * Math.cos(parseFloat(ride.pickup_latitude)*Math.PI/180) * Math.sin(dLng/2)**2;
       const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      if (dist <= 5) {
+      if (dist <= 2) {
         nearbyRides.push({
           id: ride.id,
           ride_number: ride.ride_number,

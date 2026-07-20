@@ -9,7 +9,7 @@ class RideMatchingService {
     this.searchTimeouts = new Map();
   }
 
-  async findNearbyDrivers(lat, lng, radiusKm = 5, limit = 10) {
+  async findNearbyDrivers(lat, lng, radiusKm = 2, limit = 10) {
     const drivers = await Driver.findAll({
       where: {
         is_online: true,
