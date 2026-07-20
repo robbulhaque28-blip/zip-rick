@@ -49,16 +49,18 @@ class _HomePageState extends State<HomePage> {
     try {
       if (await Geolocator.requestPermission() == LocationPermission.whileInUse || await Geolocator.checkPermission() == LocationPermission.always) {
         // First try last known position (instant)
-        Position? pos = await Geolocator.getLastKnownPosition();
-        if (pos != null && !_locationDone) {
-          setState(() { _currentLoc = LatLng(pos.latitude, pos.longitude); _pickupLoc = _currentLoc; _pickupCtrl.text = "Current Location"; _loading = false; _locationDone = true; });
-          _mapCtrl.move(_currentLoc!, 15);
+        final lastPos = await Geolocator.getLastKnownPosition();
+        if (lastPos != null && !_locationDone) {
+          final ll = LatLng(lastPos.latitude, lastPos.longitude);
+          setState(() { _currentLoc = ll; _pickupLoc = ll; _pickupCtrl.text = "Current Location"; _loading = false; _locationDone = true; });
+          _mapCtrl.move(ll, 15);
         }
         // Then get precise GPS location (might take a few seconds)
-        pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-        if (pos != null && mounted) {
-          setState(() { _currentLoc = LatLng(pos.latitude, pos.longitude); _pickupLoc = _currentLoc; _pickupCtrl.text = "Current Location"; _loading = false; _locationDone = true; });
-          _mapCtrl.move(_currentLoc!, 15);
+        final precisePos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+        if (precisePos != null && mounted) {
+          final ll = LatLng(precisePos.latitude, precisePos.longitude);
+          setState(() { _currentLoc = ll; _pickupLoc = ll; _pickupCtrl.text = "Current Location"; _loading = false; _locationDone = true; });
+          _mapCtrl.move(ll, 15);
         }
       } else {
         setState(() => _loading = false);
