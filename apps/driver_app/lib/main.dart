@@ -1,190 +1,1526 @@
-﻿import "package:flutter/material.dart";
-import "package:flutter/services.dart";
-import "package:flutter_map/flutter_map.dart";
-import "package:latlong2/latlong.dart";
-import "package:geolocator/geolocator.dart";
-import "package:http/http.dart" as http;
-import "dart:convert";
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
+import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
+import 'services/api_service.dart';
 
-void main() { WidgetsFlutterBinding.ensureInitialized(); runApp(const ZipRickDriverApp()); }
-
-final String baseUrl = "https://zip-rick-4.onrender.com/api/v1";
-String? _authToken;
-
-class ZipRickDriverApp extends StatelessWidget { const ZipRickDriverApp({super.key});
-  @override Widget build(BuildContext context) => MaterialApp(title: "Zip-Rick Driver", debugShowCheckedModeBanner: false,
-    theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6C63FF))),
-    initialRoute: "/",
-    onGenerateRoute: (s) { switch (s.name) {
-      case "/": return MaterialPageRoute(builder: (_) => const SplashScreen());
-      case "/welcome": return MaterialPageRoute(builder: (_) => const WelcomeScreen());
-      case "/login": return MaterialPageRoute(builder: (_) => const LoginScreen());
-      case "/register": return MaterialPageRoute(builder: (_) => const RegisterScreen());
-      case "/home": return MaterialPageRoute(builder: (_) => const DriverHomeScreen());
-      case "/support": return MaterialPageRoute(builder: (_) => const SupportPage());
-      default: return MaterialPageRoute(builder: (_) => const SplashScreen());
-    }},
-  );
+// ──── Colors ────
+class AppColors {
+  static const primary = Color(0xFF6C63FF);
+  static const primaryDark = Color(0xFF5A52D5);
+  static const accent = Color(0xFFFF6B6B);
+  static const success = Color(0xFF4CAF50);
+  static const warning = Color(0xFFFFA726);
+  static const bg = Color(0xFFF5F6FA);
+  static const card = Colors.white;
+  static const textDark = Color(0xFF2D2D3A);
+  static const textLight = Color(0xFF9E9E9E);
 }
 
-class WelcomeScreen extends StatelessWidget { const WelcomeScreen({super.key});
-  @override Widget build(BuildContext context) => Scaffold(backgroundColor: const Color(0xFF6C63FF),
-    body: SafeArea(child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      const Spacer(flex: 2), const Icon(Icons.electric_rickshaw_rounded, size: 100, color: Colors.white),
-      const SizedBox(height: 24), const Text("Zip-Rick Driver", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
-      const SizedBox(height: 8), const Text("Earn driving E-Rickshaw", style: TextStyle(color: Colors.white70, fontSize: 16)),
-      const Spacer(flex: 2),
-      Padding(padding: const EdgeInsets.symmetric(horizontal: 32), child: SizedBox(width: double.infinity, height: 56, child: ElevatedButton(onPressed: () => Navigator.pushNamed(context, "/login"), style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Color(0xFF6C63FF), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: const Text("Login", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))))),
-      const SizedBox(height: 16),
-      Padding(padding: const EdgeInsets.symmetric(horizontal: 32), child: SizedBox(width: double.infinity, height: 56, child: OutlinedButton(onPressed: () => Navigator.pushNamed(context, "/register"), style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white, width: 2), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: const Text("New Driver? Register", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))))),
-      const Spacer(flex: 1),
-    ]))),
-  );
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const ZippyDriverApp());
 }
 
-class SplashScreen extends StatefulWidget { const SplashScreen({super.key}); @override State<SplashScreen> createState() => _SplashScreenState(); }
+class ZippyDriverApp extends StatelessWidget {
+  const ZippyDriverApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Zippy Driver',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorSchemeSeed: AppColors.primary,
+        scaffoldBackgroundColor: AppColors.bg,
+      ),
+      initialRoute: '/',
+      routes: {
+        '/': (ctx) => const SplashScreen(),
+        '/login': (ctx) => const LoginScreen(),
+        '/register': (ctx) => const RegisterScreen(),
+        '/home': (ctx) => const DriverHomeScreen(),
+      },
+    );
+  }
+}
+
+// ──── SPLASH SCREEN ────
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
 class _SplashScreenState extends State<SplashScreen> {
-  @override void initState() { super.initState(); Future.delayed(const Duration(seconds: 2), () => Navigator.pushReplacementNamed(context, "/welcome")); }
-  @override Widget build(BuildContext context) => const Scaffold(backgroundColor: Color(0xFF6C63FF), body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.electric_rickshaw_rounded, size: 120, color: Colors.white), SizedBox(height: 24), Text("Zip-Rick Driver", style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)), SizedBox(height: 8), Text("Earn driving E-Rickshaw", style: TextStyle(color: Colors.white70, fontSize: 16)), SizedBox(height: 60), CircularProgressIndicator(color: Colors.white)])));
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    await Future.delayed(const Duration(seconds: 2));
+    final token = await ApiService.getToken();
+    if (token != null && mounted) {
+      Navigator.pushReplacementNamed(context, '/home');
+    } else if (mounted) {
+      Navigator.pushReplacementNamed(context, '/login');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.primary,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.electric_rickshaw_rounded, size: 120, color: Colors.white),
+            const SizedBox(height: 24),
+            Text('Zippy Driver',
+                style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('Your E-Rickshaw, Instantly',
+                style: TextStyle(color: Colors.white70, fontSize: 16)),
+            const SizedBox(height: 60),
+            const CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-// LOGIN SCREEN - Phone + OTP only, no name
-class LoginScreen extends StatefulWidget { const LoginScreen({super.key}); @override State<LoginScreen> createState() => _LoginScreenState(); }
+// ──── LOGIN SCREEN ────
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
 class _LoginScreenState extends State<LoginScreen> {
-  final _phoneCtrl = TextEditingController(text: "+91"); final _otpCtrl = TextEditingController();
-  bool _otpSent = false; bool _loading = false; String _error = "";
-  @override void dispose() { _phoneCtrl.dispose(); _otpCtrl.dispose(); super.dispose(); }
-  Future<void> _sendOTP() async { setState(() { _loading = true; _error = ""; }); try { final r = await http.post(Uri.parse(baseUrl + "/auth/send-otp"), headers: {"Content-Type": "application/json"}, body: jsonEncode({"phone": _phoneCtrl.text})); final d = jsonDecode(r.body); if (d["success"]) setState(() => _otpSent = true); else _error = d["error"]?["message"] ?? "Failed"; } catch (e) { _error = "Cannot connect"; } setState(() => _loading = false); }
-  Future<void> _verifyOTP() async {
-    setState(() { _loading = true; _error = ""; });
+  final _phoneCtrl = TextEditingController(text: '+91');
+  final _otpCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
+  bool _otpSent = false;
+  bool _loading = false;
+  bool _isNewUser = false;
+  String _error = '';
+
+  Future<void> _sendOtp() async {
+    setState(() { _loading = true; _error = ''; });
     try {
-      final r = await http.post(Uri.parse(baseUrl + "/auth/verify-otp"), headers: {"Content-Type": "application/json"}, body: jsonEncode({"phone": _phoneCtrl.text, "otp": _otpCtrl.text, "full_name": "", "role": "driver"}));
-      final d = jsonDecode(r.body);
-      if (d["success"]) { _authToken = d["data"]["tokens"]["accessToken"]; if (!mounted) return; Navigator.pushReplacementNamed(context, "/home"); }
-      else {
-        _error = d["error"]?["message"] ?? "Failed";
-        if (_error.contains("Name is required") || _error.contains("not found")) {
-          _error = "Account not found. Please go back and register.";
+      final res = await ApiService.sendOtp(_phoneCtrl.text.trim());
+      if (res['data'] != null && res['data']['is_new_user'] == true) {
+        setState(() { _isNewUser = true; _otpSent = true; _loading = false; });
+      } else {
+        setState(() { _otpSent = true; _isNewUser = false; _loading = false; });
+      }
+    } catch (e) {
+      setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
+    }
+  }
+
+  Future<void> _verifyOtp() async {
+    setState(() { _loading = true; _error = ''; });
+    final phone = _phoneCtrl.text.trim();
+    final otp = _otpCtrl.text.trim();
+    try {
+      if (_isNewUser) {
+        // New user - go to register
+        if (mounted) Navigator.pushReplacementNamed(context, '/register', arguments: {'phone': phone, 'otp': otp});
+        return;
+      }
+      final res = await ApiService.verifyOtp(phone, otp);
+      if (res['data'] != null && res['data']['token'] != null) {
+        await ApiService.saveToken(res['data']['token']);
+        if (mounted) Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        setState(() { _error = 'Invalid response from server'; _loading = false; });
+      }
+    } catch (e) {
+      setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 40),
+              const Icon(Icons.electric_rickshaw_rounded, size: 64, color: AppColors.primary),
+              const SizedBox(height: 24),
+              Text(
+                _otpSent ? (_isNewUser ? 'Register' : 'Verify OTP') : 'Driver Login',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _otpSent ? 'Enter the OTP sent to your phone' : 'Enter your phone to continue',
+                style: const TextStyle(color: AppColors.textLight, fontSize: 16),
+              ),
+              const SizedBox(height: 40),
+              TextField(
+                controller: _phoneCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Phone Number',
+                  prefixIcon: Icon(Icons.phone_android),
+                  border: OutlineInputBorder(),
+                ),
+                enabled: !_otpSent,
+              ),
+              if (_otpSent) ...[
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _otpCtrl,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: const InputDecoration(
+                    labelText: 'OTP',
+                    prefixIcon: Icon(Icons.lock_outline),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+              if (_error.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(_error, style: const TextStyle(color: Colors.red, fontSize: 14)),
+              ],
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _loading ? null : (_otpSent ? _verifyOtp : _sendOtp),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: _loading
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : Text(_otpSent ? 'Verify & Login' : 'Send OTP', style: const TextStyle(fontSize: 16)),
+                ),
+              ),
+              if (!_otpSent) ...[
+                const SizedBox(height: 16),
+                Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.pushReplacementNamed(context, '/register'),
+                    child: const Text('New driver? Register here'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _phoneCtrl.dispose();
+    _otpCtrl.dispose();
+    _nameCtrl.dispose();
+    super.dispose();
+  }
+}
+
+// ──── REGISTER SCREEN ────
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
+  @override
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
+  final _nameCtrl = TextEditingController();
+  final _vehicleNoCtrl = TextEditingController();
+  final _vehicleModelCtrl = TextEditingController();
+  bool _loading = false;
+  String _error = '';
+
+  String _phone = '';
+  String _otp = '';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args = ModalRoute.of(context)?.settings.arguments as Map?;
+    if (args != null) {
+      _phone = args['phone'] ?? '';
+      _otp = args['otp'] ?? '';
+    }
+  }
+
+  Future<void> _register() async {
+    if (_nameCtrl.text.trim().isEmpty) {
+      setState(() => _error = 'Please enter your full name');
+      return;
+    }
+    setState(() { _loading = true; _error = ''; });
+    try {
+      // If OTP was already verified, use register endpoint
+      final res = await ApiService.registerDriver(_phone, _nameCtrl.text.trim(), _otp);
+      if (res['data'] != null && res['data']['token'] != null) {
+        await ApiService.saveToken(res['data']['token']);
+        // Save vehicle info
+        if (_vehicleNoCtrl.text.isNotEmpty || _vehicleModelCtrl.text.isNotEmpty) {
+          try {
+            await ApiService.saveVehicle({
+              'vehicle_number': _vehicleNoCtrl.text.trim(),
+              'vehicle_model': _vehicleModelCtrl.text.trim(),
+            });
+          } catch (_) {}
+        }
+        if (mounted) Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        setState(() { _error = 'Registration failed. Try again.'; _loading = false; });
+      }
+    } catch (e) {
+      setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Register as Driver')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Complete Your Profile',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('Fill in your details to start earning',
+                style: TextStyle(color: AppColors.textLight)),
+            const SizedBox(height: 32),
+            TextField(
+              controller: _nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Full Name *',
+                prefixIcon: Icon(Icons.person),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _vehicleNoCtrl,
+              decoration: const InputDecoration(
+                labelText: 'E-Rickshaw Number (optional)',
+                prefixIcon: Icon(Icons.directions_car),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _vehicleModelCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Vehicle Model (optional)',
+                prefixIcon: Icon(Icons.model_training),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_error.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(_error, style: const TextStyle(color: Colors.red)),
+            ],
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: _loading ? null : _register,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _loading
+                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('Register & Start', style: TextStyle(fontSize: 16)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _vehicleNoCtrl.dispose();
+    _vehicleModelCtrl.dispose();
+    super.dispose();
+  }
+}
+
+// ──── DRIVER HOME SCREEN (Main) ────
+class DriverHomeScreen extends StatefulWidget {
+  const DriverHomeScreen({super.key});
+  @override
+  State<DriverHomeScreen> createState() => _DriverHomeScreenState();
+}
+
+class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBindingObserver {
+  // Socket
+  io.Socket? _socket;
+  bool _socketConnected = false;
+
+  // Location
+  Position? _currentPosition;
+  bool _locationLoading = true;
+
+  // Online/Offline
+  bool _isOnline = false;
+  bool _togglingOnline = false;
+
+  // Ride requests
+  Map<String, dynamic>? _rideRequest;
+  bool _showingRideRequest = false;
+
+  // Active ride
+  Map<String, dynamic>? _activeRide;
+  bool _hasActiveRide = false;
+
+  // Driver profile
+  Map<String, dynamic>? _driverProfile;
+  String _driverName = 'Driver';
+
+  // Polling timer
+  Timer? _pollTimer;
+
+  // Navigation
+  int _bottomNavIndex = 0;
+
+  // Location fetch guard
+  bool _locationFetched = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _fetchLocation();
+    _connectSocket();
+    _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _pollTimer?.cancel();
+    _socket?.disconnect();
+    _socket?.dispose();
+    super.dispose();
+  }
+
+  // ─── Socket Connection ───
+  Future<void> _connectSocket() async {
+    final token = await ApiService.getToken();
+    if (token == null) return;
+
+    _socket = io.io(
+      'https://zip-rick-4.onrender.com',
+      <String, dynamic>{
+        'transports': ['websocket'],
+        'auth': {'token': token},
+      },
+    );
+
+    _socket!.onConnect((_) {
+      setState(() => _socketConnected = true);
+      debugPrint('Socket connected');
+    });
+
+    _socket!.on('ride:new_request', (data) {
+      debugPrint('Ride request received: $data');
+      if (mounted && !_hasActiveRide) {
+        setState(() {
+          _rideRequest = data as Map<String, dynamic>;
+          _showingRideRequest = true;
+        });
+      }
+    });
+
+    _socket!.on('ride:taken', (data) {
+      debugPrint('Ride taken by another driver');
+      if (mounted && _showingRideRequest) {
+        setState(() {
+          _showingRideRequest = false;
+          _rideRequest = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ride was taken by another driver'), duration: Duration(seconds: 2)),
+        );
+      }
+    });
+
+    _socket!.on('ride:accepted', (data) {
+      debugPrint('Ride accepted by me: $data');
+      setState(() => _hasActiveRide = true);
+      _loadActiveRide();
+    });
+
+    _socket!.on('driver:status', (data) {
+      debugPrint('Status update: $data');
+    });
+
+    _socket!.on('ride:cancelled', (data) {
+      debugPrint('Ride cancelled: $data');
+      setState(() {
+        _hasActiveRide = false;
+        _activeRide = null;
+      });
+    });
+
+    _socket!.onDisconnect((_) {
+      setState(() => _socketConnected = false);
+      debugPrint('Socket disconnected');
+    });
+
+    _socket!.connect();
+  }
+
+  // ─── Location ───
+  Future<void> _fetchLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() => _locationLoading = false);
+        return;
+      }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() => _locationLoading = false);
+          return;
         }
       }
-    } catch (e) { _error = "Cannot connect"; }
-    setState(() => _loading = false);
-  }
-  @override Widget build(BuildContext context) => Scaffold(
-    body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const SizedBox(height: 60), const Icon(Icons.electric_rickshaw_rounded, size: 64, color: Color(0xFF6C63FF)),
-      const SizedBox(height: 24),
-      Text("Driver Login", style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-      const SizedBox(height: 8), Text("Sign in to your account", style: const TextStyle(color: Color(0xFF6B7280), fontSize: 16)),
-      const SizedBox(height: 40),
-      TextField(controller: _phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "Phone", prefixIcon: Icon(Icons.phone_android), border: OutlineInputBorder())),
-      if (_otpSent) ...[
-        const SizedBox(height: 16), TextField(controller: _otpCtrl, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: "OTP", prefixIcon: Icon(Icons.lock_outline), border: OutlineInputBorder())),
-      ],
-      if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error, style: const TextStyle(color: Colors.red))),
-      const SizedBox(height: 24),
-      ElevatedButton(onPressed: _loading ? null : (_otpSent ? _verifyOTP : _sendOTP), child: _loading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Text(_otpSent ? "Verify OTP" : "Send OTP")),
-    ]))),
-  );
-}
 
-// REGISTER SCREEN - Phone + Name + OTP
-class RegisterScreen extends StatefulWidget { const RegisterScreen({super.key}); @override State<RegisterScreen> createState() => _RegisterScreenState(); }
-class _RegisterScreenState extends State<RegisterScreen> {
-  final _phoneCtrl = TextEditingController(text: "+91"); final _otpCtrl = TextEditingController(); final _nameCtrl = TextEditingController();
-  bool _otpSent = false; bool _loading = false; String _error = "";
-  @override void dispose() { _phoneCtrl.dispose(); _otpCtrl.dispose(); _nameCtrl.dispose(); super.dispose(); }
-  Future<void> _sendOTP() async { setState(() { _loading = true; _error = ""; }); try { final r = await http.post(Uri.parse(baseUrl + "/auth/send-otp"), headers: {"Content-Type": "application/json"}, body: jsonEncode({"phone": _phoneCtrl.text})); final d = jsonDecode(r.body); if (d["success"]) setState(() => _otpSent = true); else _error = d["error"]?["message"] ?? "Failed"; } catch (e) { _error = "Cannot connect"; } setState(() => _loading = false); }
-  Future<void> _verifyOTP() async {
-    if (_nameCtrl.text.trim().isEmpty) { _error = "Full Name is required"; return; }
-    setState(() { _loading = true; _error = ""; });
+      // Try last known first for speed
+      Position? pos = await Geolocator.getLastKnownPosition();
+      if (pos != null) {
+        setState(() {
+          _currentPosition = pos;
+          _locationLoading = false;
+          _locationFetched = true;
+        });
+      }
+
+      // Then get precise location
+      pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+      if (pos != null && mounted) {
+        setState(() {
+          _currentPosition = pos;
+          _locationLoading = false;
+          _locationFetched = true;
+        });
+        // Send location update via socket
+        _sendLocationUpdate(pos);
+      }
+    } catch (e) {
+      debugPrint('Location error: $e');
+      setState(() => _locationLoading = false);
+    }
+  }
+
+  void _sendLocationUpdate(Position pos) {
+    if (_socket != null && _socketConnected) {
+      _socket!.emit('driver:location_update', {
+        'latitude': pos.latitude,
+        'longitude': pos.longitude,
+      });
+    }
+  }
+
+  // ─── Load Profile ───
+  Future<void> _loadProfile() async {
     try {
-      final r = await http.post(Uri.parse(baseUrl + "/auth/verify-otp"), headers: {"Content-Type": "application/json"}, body: jsonEncode({"phone": _phoneCtrl.text, "otp": _otpCtrl.text, "full_name": _nameCtrl.text, "role": "driver"}));
-      final d = jsonDecode(r.body);
-      if (d["success"]) { _authToken = d["data"]["tokens"]["accessToken"]; if (!mounted) return; Navigator.pushReplacementNamed(context, "/register"); }
-      else { _error = d["error"]?["message"] ?? "Failed"; }
-    } catch (e) { _error = "Cannot connect"; }
-    setState(() => _loading = false);
+      final res = await ApiService.getProfile();
+      if (res['data'] != null && res['data']['driver'] != null) {
+        final driver = res['data']['driver'];
+        final user = driver['user'];
+        setState(() {
+          _driverProfile = driver;
+          _driverName = user?['full_name'] ?? 'Driver';
+          _isOnline = driver['is_online'] == true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Load profile error: $e');
+    }
   }
-  @override Widget build(BuildContext context) => Scaffold(
-    body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const SizedBox(height: 60), const Icon(Icons.electric_rickshaw_rounded, size: 64, color: Color(0xFF6C63FF)),
-      const SizedBox(height: 24),
-      Text("Register as Driver", style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-      const SizedBox(height: 8), Text("Create your driver account", style: const TextStyle(color: Color(0xFF6B7280), fontSize: 16)),
-      const SizedBox(height: 40),
-      TextField(controller: _phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: "Phone", prefixIcon: Icon(Icons.phone_android), border: OutlineInputBorder())),
-      if (_otpSent) ...[
-        const SizedBox(height: 16), TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: "Full Name", prefixIcon: Icon(Icons.person), border: OutlineInputBorder())),
-        const SizedBox(height: 16), TextField(controller: _otpCtrl, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: "OTP", prefixIcon: Icon(Icons.lock_outline), border: OutlineInputBorder())),
+
+  // ─── Online/Offline Toggle ───
+  Future<void> _toggleOnline() async {
+    if (_position == null) {
+      await _fetchLocation();
+      if (_position == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unable to get GPS location. Please enable GPS.')),
+          );
+        }
+        return;
+      }
+    }
+
+    setState(() => _togglingOnline = true);
+    try {
+      final res = await ApiService.toggleOnline();
+      if (res['data'] != null) {
+        setState(() {
+          _isOnline = res['data']['is_online'] == true;
+          _togglingOnline = false;
+        });
+
+        // If going online, send location and start polling
+        if (_isOnline && _currentPosition != null) {
+          _sendLocationUpdate(_currentPosition!);
+          _startPolling();
+          // Emit via socket too
+          if (_socket != null && _socketConnected) {
+            _socket!.emit('driver:go_online');
+          }
+        } else {
+          _stopPolling();
+          if (_socket != null && _socketConnected) {
+            _socket!.emit('driver:go_offline');
+          }
+        }
+      }
+    } catch (e) {
+      setState(() => _togglingOnline = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString().replaceFirst("Exception: ", "")}')),
+        );
+      }
+    }
+  }
+
+  // ─── Polling for ride requests ───
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _pollForRides());
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  Future<void> _pollForRides() async {
+    if (!_isOnline || _hasActiveRide || _showingRideRequest) return;
+    try {
+      final res = await ApiService.getSearchingRides();
+      if (res['data'] != null && res['data']['rides'] != null && (res['data']['rides'] as List).isNotEmpty) {
+        final rides = res['data']['rides'] as List;
+        if (mounted && !_hasActiveRide && !_showingRideRequest) {
+          setState(() {
+            _rideRequest = rides[0] as Map<String, dynamic>;
+            _showingRideRequest = true;
+          });
+        }
+      }
+    } catch (e) {
+      // Silently fail polling
+    }
+  }
+
+  // ─── Accept/Reject Ride ───
+  Future<void> _acceptRide() async {
+    if (_rideRequest == null || _socket == null) return;
+    final rideId = _rideRequest!['ride_id'];
+    _socket!.emit('ride:accept', {'ride_id': rideId});
+    setState(() {
+      _showingRideRequest = false;
+      _hasActiveRide = true;
+    });
+    // Wait a bit then load the active ride
+    await Future.delayed(const Duration(seconds: 2));
+    _loadActiveRide();
+  }
+
+  void _rejectRide() {
+    setState(() {
+      _showingRideRequest = false;
+      _rideRequest = null;
+    });
+  }
+
+  // ─── Load Active Ride ───
+  Future<void> _loadActiveRide() async {
+    try {
+      final res = await ApiService.getActiveRide();
+      if (res['data'] != null && res['data']['ride'] != null) {
+        setState(() {
+          _activeRide = res['data']['ride'];
+          _hasActiveRide = true;
+        });
+      } else {
+        setState(() {
+          _activeRide = null;
+          _hasActiveRide = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _activeRide = null;
+        _hasActiveRide = false;
+      });
+    }
+  }
+
+  // ─── Ride Status Updates ───
+  void _updateRideStatus(String event) {
+    if (_socket != null && _activeRide != null) {
+      _socket!.emit(event, {'ride_id': _activeRide!['id']});
+    }
+  }
+
+  // ─── Call Customer ───
+  Future<void> _callCustomer() async {
+    if (_activeRide == null || _activeRide!['customer'] == null) return;
+    final phone = _activeRide!['customer']['user']?['phone'];
+    if (phone != null) {
+      final uri = Uri.parse('tel:$phone');
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      }
+    }
+  }
+
+  // ─── SOS ───
+  Future<void> _sendSOS() async {
+    if (_currentPosition == null) return;
+    try {
+      await ApiService.sendSOS(_currentPosition!.latitude, _currentPosition!.longitude);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('SOS sent! Emergency contacts notified.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('SOS failed: ${e.toString().replaceFirst("Exception: ", "")}')),
+        );
+      }
+    }
+  }
+
+  // ─── Support Ticket ───
+  void _showSupportDialog() {
+    final subjectCtrl = TextEditingController();
+    final msgCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Support Ticket'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: subjectCtrl, decoration: const InputDecoration(labelText: 'Subject', border: OutlineInputBorder())),
+            const SizedBox(height: 12),
+            TextField(controller: msgCtrl, maxLines: 3, decoration: const InputDecoration(labelText: 'Message', border: OutlineInputBorder())),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              if (subjectCtrl.text.isEmpty || msgCtrl.text.isEmpty) return;
+              try {
+                await ApiService.createTicket(subjectCtrl.text, msgCtrl.text);
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Ticket created successfully')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed: ${e.toString().replaceFirst("Exception: ", "")}')),
+                  );
+                }
+              }
+            },
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Logout ───
+  Future<void> _logout() async {
+    await ApiService.clearToken();
+    if (_socket != null) {
+      _socket!.emit('driver:go_offline');
+      _socket!.disconnect();
+    }
+    _pollTimer?.cancel();
+    if (mounted) Navigator.pushReplacementNamed(context, '/login');
+  }
+
+  // ─── Build ───
+  @override
+  Widget build(BuildContext context) {
+    final pages = [
+      _buildHomeTab(context),
+      _buildEarningsTab(context),
+      _buildProfileTab(context),
+    ];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_hasActiveRide ? 'Active Ride' : 'Zippy Driver'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        actions: [
+          if (!_hasActiveRide)
+            IconButton(
+              icon: const Icon(Icons.support_agent),
+              onPressed: _showSupportDialog,
+              tooltip: 'Support',
+            ),
+          IconButton(
+            icon: const Icon(Icons.sos, color: Colors.redAccent),
+            onPressed: _sendSOS,
+            tooltip: 'SOS Emergency',
+          ),
+          IconButton(
+            icon: Icon(
+              _socketConnected ? Icons.wifi : Icons.wifi_off,
+              color: _socketConnected ? Colors.greenAccent : Colors.orange,
+              size: 20,
+            ),
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(_socketConnected ? 'Connected' : 'Disconnected. Trying to reconnect...')),
+            ),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          pages[_bottomNavIndex],
+          // Ride Request Popup
+          if (_showingRideRequest && _rideRequest != null) _buildRideRequestPopup(),
+          // Loading overlay for active ride
+          if (_hasActiveRide && _activeRide == null)
+            const Center(child: CircularProgressIndicator()),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _bottomNavIndex,
+        onTap: (i) => setState(() => _bottomNavIndex = i),
+        selectedItemColor: AppColors.primary,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.earnings), label: 'Earnings'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        ],
+      ),
+    );
+  }
+
+  Position? get _position => _currentPosition;
+
+  // ─── HOME TAB ───
+  Widget _buildHomeTab(BuildContext context) {
+    if (_hasActiveRide && _activeRide != null) {
+      return _buildActiveRideView();
+    }
+
+    return Column(
+      children: [
+        // Online Status Card
+        Container(
+          margin: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: _isOnline ? AppColors.success : AppColors.textLight,
+                child: Icon(
+                  _isOnline ? Icons.power_settings_new : Icons.power_off,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _isOnline ? 'You are ONLINE' : 'You are OFFLINE',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _isOnline ? AppColors.success : AppColors.textLight,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _isOnline
+                          ? 'Ride requests will appear here'
+                          : 'Go online to receive ride requests',
+                      style: const TextStyle(color: AppColors.textLight, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: _isOnline,
+                onChanged: _togglingOnline ? null : (_) => _toggleOnline(),
+                activeColor: AppColors.success,
+              ),
+            ],
+          ),
+        ),
+
+        // Map
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: _currentPosition != null
+                ? FlutterMap(
+                    options: MapOptions(
+                      center: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                      zoom: 15.0,
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.ziprick.driver',
+                      ),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                            width: 80,
+                            height: 80,
+                            child: Icon(
+                              Icons.electric_rickshaw_rounded,
+                              size: 48,
+                              color: _isOnline ? AppColors.success : AppColors.textLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  )
+                : const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 12),
+                        Text('Fetching your location...'),
+                      ],
+                    ),
+                  ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Refresh Location Button
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _fetchLocation,
+              icon: const Icon(Icons.my_location),
+              label: const Text('Refresh Location'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
       ],
-      if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error, style: const TextStyle(color: Colors.red))),
-      const SizedBox(height: 24),
-      ElevatedButton(onPressed: _loading ? null : (_otpSent ? _verifyOTP : _sendOTP), child: _loading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Text(_otpSent ? "Create Account" : "Send OTP")),
-    ]))),
-  );
-}
-
-// Keep all the rest exactly as before - DriverHomeScreen, SupportPage, etc.
-class DriverHomeScreen extends StatefulWidget { const DriverHomeScreen({super.key}); @override State<DriverHomeScreen> createState() => _DriverHomeScreenState(); }
-class _DriverHomeScreenState extends State<DriverHomeScreen> {
-  final MapController _mapController = MapController(); LatLng _driverLocation = const LatLng(26.1445, 91.7362);
-  bool _isOnline = false; bool _isLoading = true; int _currentTab = 0; double _commissionDue = 0; double _totalEarnings = 0; bool _commissionLoading = false;
-  List<Map<String, dynamic>> _rideRequests = []; Map<String, dynamic>? _activeRide; int _pollCount = 0;
-
-  void _sosAlert() async {
-    showDialog(context: context, builder: (ctx) => AlertDialog(
-      title: const Text("🚨 SOS Emergency", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-      content: const Text("This will alert our support team immediately. Do you need help?"),
-      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")), ElevatedButton(onPressed: () async { Navigator.pop(ctx); try { final res = await http.post(Uri.parse(baseUrl + "/sos"), headers: {"Authorization": "Bearer " + (_authToken ?? "")}); final data = jsonDecode(res.body); if (data["success"]) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("SOS sent!"))); } } catch (_) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed"))); } }, style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text("Send SOS", style: TextStyle(color: Colors.white)))],
-    ));
+    );
   }
 
-  @override void initState() { super.initState(); _getLocation(); _startPolling(); }
-  Future<void> _getLocation() async {
-    try { if (await Geolocator.requestPermission() == LocationPermission.whileInUse || await Geolocator.checkPermission() == LocationPermission.always) { final p = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high, timeLimit: const Duration(seconds: 10)); setState(() { _driverLocation = LatLng(p.latitude, p.longitude); _isLoading = false; }); _mapController.move(_driverLocation, 14); } else { setState(() => _isLoading = false); } } catch (_) { setState(() => _isLoading = false); }
-  }
-  void _startPolling() { Future.delayed(const Duration(seconds: 5), () { if (!mounted) return; if (_isOnline) { _checkForRideRequests(); } if (mounted) _startPolling(); }); }
-  void _checkForRideRequests() async {
-    try { final res = await http.get(Uri.parse(baseUrl + "/rides/searching/available"), headers: {"Authorization": "Bearer " + (_authToken ?? "")}); final data = jsonDecode(res.body); if (data["success"] && data["data"] is List && data["data"].length > 0) { for (var ride in data["data"]) { bool exists = _rideRequests.any((r) => r["id"] == ride["id"]); if (!exists) { setState(() { _rideRequests.add({"id": ride["id"], "pickup_address": ride["pickup_address"] ?? "Unknown", "drop_address": ride["drop_address"] ?? "Unknown", "ride_number": ride["ride_number"] ?? "N/A", "total_fare": ride["total_fare"]?.toString() ?? "0"}); }); } } } } catch (_) {}
-  }
-  void _acceptRide(Map<String, dynamic> ride) async {
-    try { final res = await http.post(Uri.parse(baseUrl + "/rides/" + ride["id"] + "/accept"), headers: {"Authorization": "Bearer " + (_authToken ?? ""), "Content-Type": "application/json"}); final data = jsonDecode(res.body); if (data["success"]) { setState(() { _rideRequests.removeWhere((r) => r["id"] == ride["id"]); _activeRide = ride; }); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ride accepted!"))); } } catch (_) {}
-  }
-  void _rejectRide(Map<String, dynamic> ride) { setState(() => _rideRequests.removeWhere((r) => r["id"] == ride["id"])); }
-  void _completeRide() { setState(() { _activeRide = null; _commissionDue += (_commissionDue + 10); }); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ride completed!"))); }
-  void _checkCommissionBeforeOnline() async {
-    try { setState(() => _commissionLoading = true); final res = await http.get(Uri.parse(baseUrl + "/drivers/commission/due"), headers: {"Authorization": "Bearer " + (_authToken ?? "")}); final data = jsonDecode(res.body); setState(() => _commissionLoading = false);
-      if (data["success"] && data["data"] != null) { final due = (data["data"]["commission_due"] ?? 0).toDouble(); final earnings = (data["data"]["total_earnings"] ?? 0).toDouble(); setState(() { _commissionDue = due; _totalEarnings = earnings; });
-        if (due > 0) { showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text("Commission Due", style: TextStyle(color: Colors.red)), content: Column(mainAxisSize: MainAxisSize.min, children: [const Text("Pay commission to go online."), Text("Due: Rs " + due.toStringAsFixed(0), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF6C63FF)))]), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")), ElevatedButton(onPressed: () { Navigator.pop(ctx); _showCommissionPayment(); }, child: const Text("Pay Now"))])); return; } }
-      setState(() => _isOnline = true);
-    } catch (_) { setState(() { _commissionLoading = false; _isOnline = true; }); }
-  }
-  void _showCommissionPayment() { showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (ctx) => Container(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [const Text("Pay Commission", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), const SizedBox(height: 20), const Text("Pending Commission", style: TextStyle(color: Colors.grey)), const SizedBox(height: 8), Text("Rs " + _commissionDue.toStringAsFixed(0), style: const TextStyle(fontSize: 42, fontWeight: FontWeight.bold, color: Color(0xFF6C63FF))), const SizedBox(height: 24), SizedBox(width: double.infinity, height: 56, child: ElevatedButton(onPressed: _commissionLoading ? null : () async { try { setState(() => _commissionLoading = true); final res = await http.post(Uri.parse(baseUrl + "/drivers/commission/pay"), headers: {"Authorization": "Bearer " + (_authToken ?? ""), "Content-Type": "application/json"}, body: jsonEncode({"amount": _commissionDue})); final data = jsonDecode(res.body); setState(() => _commissionLoading = false); if (data["success"]) { setState(() => _commissionDue = 0); Navigator.pop(ctx); setState(() => _isOnline = true); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Paid!"))); } } catch (_) { setState(() => _commissionLoading = false); } }, child: _commissionLoading ? const SizedBox(height:20,width:20,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)) : const Text("Pay Now")))]))); }
-  @override Widget build(BuildContext context) { final pages = [_home(), _earnings(), _profile()]; return Scaffold(body: pages[_currentTab], bottomNavigationBar: BottomNavigationBar(currentIndex: _currentTab, onTap: (i) => setState(() => _currentTab = i), items: const [BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"), BottomNavigationBarItem(icon: Icon(Icons.trending_up), label: "Earnings"), BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile")])); }
-  Widget _home() => Scaffold(appBar: AppBar(title: const Text("Zip-Rick Driver"), actions: [IconButton(icon: const Icon(Icons.headset_mic), onPressed: () => Navigator.pushNamed(context, "/support")), const SizedBox(width: 8), IconButton(icon: const Icon(Icons.emergency, color: Colors.red), onPressed: _sosAlert)]),
-    body: _isLoading ? const Center(child: CircularProgressIndicator()) : Stack(children: [
-      FlutterMap(mapController: _mapController, options: MapOptions(center: _driverLocation, zoom: 14), children: [TileLayer(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", userAgentPackageName: "com.ziprick.driver"), MarkerLayer(markers: [Marker(point: _driverLocation, width: 40, height: 40, child: const Icon(Icons.electric_rickshaw_rounded, color: Color(0xFF6C63FF), size: 35))])]),
-      Positioned(bottom: 140, left: 0, right: 0, child: Center(child: GestureDetector(onTap: _showCommissionPayment, child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), decoration: BoxDecoration(color: Colors.red.withOpacity(0.9), borderRadius: BorderRadius.circular(20)), child: Text("Commission Due: Rs " + _commissionDue.toStringAsFixed(0), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)))))),
-      Positioned(top: 16, left: 0, right: 0, child: Center(child: GestureDetector(onTap: () { if (!_isOnline) { _checkCommissionBeforeOnline(); } else { setState(() => _isOnline = false); } }, child: Container(width: 100, height: 100, decoration: BoxDecoration(shape: BoxShape.circle, color: _isOnline ? const Color(0xFF00D9A6) : Colors.white.withOpacity(0.9), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10)]), child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(_isOnline ? Icons.power_settings_new : Icons.power_off, color: _isOnline ? Colors.white : const Color(0xFF6C63FF), size: 28), Text(_isOnline ? "ONLINE" : "OFFLINE", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _isOnline ? Colors.white : const Color(0xFF6C63FF)))])))))),
-      Positioned(bottom: 80, left: 0, right: 0, child: Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), decoration: BoxDecoration(color: Colors.white.withOpacity(0.9), borderRadius: BorderRadius.circular(20)), child: Text(_isOnline ? "Waiting for rides..." : "Tap to go online", style: TextStyle(color: _isOnline ? Colors.green : Colors.grey, fontSize: 14))))),
-      Positioned(right: 16, bottom: 16, child: FloatingActionButton(mini: true, onPressed: _getLocation, backgroundColor: Colors.white, child: const Icon(Icons.my_location, color: Color(0xFF6C63FF)))),
-    ]));
-  Widget _earnings() => Scaffold(appBar: AppBar(title: const Text("Earnings")), body: Padding(padding: const EdgeInsets.all(24), child: Column(children: [Card(child: Padding(padding: const EdgeInsets.all(24), child: Column(children: [const Text("Total Earnings", style: TextStyle(color: Colors.grey)), const Text("Rs 0", style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Color(0xFF6C63FF))), const Divider(), Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text("Today"), const Text("Rs 0")]), Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text("This Week"), const Text("Rs 0")]), Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text("Rides"), const Text("0")])]))), const SizedBox(height: 16), Card(child: ListTile(leading: const Icon(Icons.history), title: const Text("Ride History"), trailing: const Icon(Icons.chevron_right))), const SizedBox(height: 8), Card(child: ListTile(leading: Icon(_commissionDue > 0 ? Icons.payment : Icons.check_circle, color: _commissionDue > 0 ? Colors.red : Colors.green), title: const Text("Pay Commission"), subtitle: Text("Due: Rs " + _commissionDue.toStringAsFixed(0)), trailing: TextButton(onPressed: _commissionDue > 0 ? () { _showCommissionPayment(); } : null, child: Text(_commissionDue > 0 ? "Pay Now" : "Cleared"))))])));
-  Widget _profile() => FutureBuilder(future: http.get(Uri.parse(baseUrl + "/drivers/profile"), headers: {"Authorization": "Bearer " + (_authToken ?? "")}), builder: (ctx, snap) { String name = "Driver"; String phone = ""; if (snap.hasData) { try { final d = jsonDecode(snap.data!.body); if (d["success"] && d["data"] != null && d["data"]["driver"] != null) { name = d["data"]["driver"]["user"]?["full_name"] ?? "Driver"; phone = d["data"]["driver"]["user"]?["phone"] ?? ""; } } catch (_) {} } return Scaffold(appBar: AppBar(title: const Text("Profile")), body: ListView(padding: const EdgeInsets.all(24), children: [const CircleAvatar(radius: 40, child: Icon(Icons.person, size: 40)), const SizedBox(height: 16), Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center), Text(phone, style: TextStyle(color: Colors.grey[600]), textAlign: TextAlign.center), const SizedBox(height: 32), Card(child: ListTile(leading: const Icon(Icons.star, color: Colors.amber), title: const Text("Rating"), trailing: const Text("0.0"))), Card(child: ListTile(leading: const Icon(Icons.document_scanner), title: const Text("My Documents"), trailing: const Icon(Icons.chevron_right)))])); });
-}
+  // ─── ACTIVE RIDE VIEW ───
+  Widget _buildActiveRideView() {
+    final ride = _activeRide!;
+    final pickup = ride['pickup_address'] ?? 'Pickup location';
+    final drop = ride['drop_address'] ?? 'Drop location';
+    final fare = ride['total_fare']?.toString() ?? '--';
+    final status = ride['status'] ?? 'unknown';
+    final driver = ride['driver'];
 
-class SupportPage extends StatefulWidget { const SupportPage({super.key}); @override State<SupportPage> createState() => _SupportPageState(); }
-class _SupportPageState extends State<SupportPage> {
-  final _subjectCtrl = TextEditingController(); final _descCtrl = TextEditingController(); bool _loading = false; List _tickets = []; bool _loadTickets = true;
-  @override void initState() { super.initState(); _fetchTickets(); }
-  Future<void> _fetchTickets() async { try { final res = await http.get(Uri.parse(baseUrl + "/support/tickets"), headers: {"Authorization": "Bearer " + (_authToken ?? "")}); final data = jsonDecode(res.body); if (data["success"]) setState(() { _tickets = data["data"] ?? []; _loadTickets = false; }); } catch (_) { setState(() => _loadTickets = false); } }
-  Future<void> _createTicket() async { if (_subjectCtrl.text.isEmpty || _descCtrl.text.isEmpty) return; setState(() => _loading = true); try { final res = await http.post(Uri.parse(baseUrl + "/support/tickets"), headers: {"Authorization": "Bearer " + (_authToken ?? ""), "Content-Type": "application/json"}, body: jsonEncode({"subject": _subjectCtrl.text, "description": _descCtrl.text})); final data = jsonDecode(res.body); if (data["success"]) { _subjectCtrl.clear(); _descCtrl.clear(); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Created!"))); _fetchTickets(); } } catch (_) {} setState(() => _loading = false); }
-  @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text("Support")), body: _loadTickets ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(16), children: [
-    const Text("Create Ticket", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 12), TextField(controller: _subjectCtrl, decoration: const InputDecoration(labelText: "Subject", border: OutlineInputBorder())), const SizedBox(height: 8),
-    TextField(controller: _descCtrl, decoration: const InputDecoration(labelText: "Issue", border: OutlineInputBorder()), maxLines: 3), const SizedBox(height: 12),
-    ElevatedButton(onPressed: _loading ? null : _createTicket, child: _loading ? const SizedBox(height:20,width:20,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)) : const Text("Submit")),
-    const Divider(height: 32), Text("My Tickets (${_tickets.length})", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-    ..._tickets.isEmpty ? [const Padding(padding: EdgeInsets.all(24), child: Text("No tickets"))] : _tickets.map((t) => Card(child: ListTile(leading: Icon(t["priority"] == "urgent" ? Icons.warning : Icons.support_agent, color: t["priority"] == "urgent" ? Colors.red : Colors.blue), title: Text(t["subject"] ?? "Support"), subtitle: Text(t["status"] ?? "open"), trailing: Text(t["priority"] ?? "medium", style: const TextStyle(fontSize: 12))))),
-  ]));
+    String statusText = '';
+    Color statusColor = AppColors.primary;
+    switch (status) {
+      case 'driver_assigned':
+        statusText = 'Heading to pickup';
+        statusColor = AppColors.warning;
+        break;
+      case 'driver_arrived':
+        statusText = 'Arrived at pickup';
+        statusColor = AppColors.success;
+        break;
+      case 'started':
+        statusText = 'Ride in progress';
+        statusColor = AppColors.primary;
+        break;
+      case 'completed':
+        statusText = 'Ride completed';
+        statusColor = AppColors.success;
+        break;
+      default:
+        statusText = status;
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Status Card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: statusColor.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: statusColor, size: 32),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Status: $statusText',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: statusColor)),
+                      Text('Fare: ₹$fare',
+                          style: const TextStyle(fontSize: 14, color: AppColors.textLight)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Pickup & Drop
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.trip_origin, color: AppColors.success, size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(pickup, style: const TextStyle(fontSize: 16))),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
+                    child: Column(
+                      children: List.generate(3, (_) => Container(
+                        width: 2, height: 4,
+                        margin: const EdgeInsets.symmetric(vertical: 2),
+                        color: Colors.grey.shade400,
+                      )),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on, color: Colors.red, size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(drop, style: const TextStyle(fontSize: 16))),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Action buttons
+          if (status == 'driver_assigned') ...[
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _updateRideStatus('ride:arrived'),
+                    icon: const Icon(Icons.check_circle),
+                    label: const Text('I\'ve Arrived'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.warning,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (status == 'driver_arrived') ...[
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _updateRideStatus('ride:start'),
+                    icon: const Icon(Icons.play_arrow),
+                    label: const Text('Start Ride'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (status == 'started') ...[
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _updateRideStatus('ride:complete'),
+                    icon: const Icon(Icons.stop_circle),
+                    label: const Text('Complete Ride'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+
+          const SizedBox(height: 12),
+
+          // Call Customer
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _callCustomer,
+              icon: const Icon(Icons.phone),
+              label: const Text('Call Customer'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── RIDE REQUEST POPUP ───
+  Widget _buildRideRequestPopup() {
+    final req = _rideRequest!;
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Material(
+        elevation: 8,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Countdown / urgency indicator
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.notifications_active, color: AppColors.accent, size: 18),
+                    SizedBox(width: 6),
+                    Text('New Ride Request!', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Distance
+              if (req['distance_km'] != null)
+                Text(
+                  '${req['distance_km']} km away',
+                  style: const TextStyle(fontSize: 14, color: AppColors.textLight),
+                ),
+              const SizedBox(height: 12),
+              // Pickup
+              Row(
+                children: [
+                  const Icon(Icons.trip_origin, color: AppColors.success, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      req['pickup_address'] ?? 'Pickup',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Drop
+              Row(
+                children: [
+                  const Icon(Icons.location_on, color: Colors.red, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      req['drop_address'] ?? 'Drop',
+                      style: const TextStyle(fontSize: 15),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Fare
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('Fare: ', style: TextStyle(fontSize: 18)),
+                  Text(
+                    '₹${req['total_fare'] ?? '--'}',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // Accept / Reject buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _acceptRide,
+                      icon: const Icon(Icons.check_circle),
+                      label: const Text('Accept'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _rejectRide,
+                      icon: const Icon(Icons.cancel),
+                      label: const Text('Decline'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─── EARNINGS TAB ───
+  Widget _buildEarningsTab(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: ApiService.getEarnings(),
+      builder: (ctx, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                const SizedBox(height: 12),
+                Text('Error: ${snapshot.error.toString().replaceFirst("Exception: ", "")}'),
+                const SizedBox(height: 12),
+                ElevatedButton(onPressed: () => setState(() {}), child: const Text('Retry')),
+              ],
+            ),
+          );
+        }
+
+        final data = snapshot.data?['data'] ?? {};
+        final totalEarnings = data['total_earnings']?.toString() ?? '0';
+        final todayEarnings = data['today_earnings']?.toString() ?? '0';
+        final weekEarnings = data['week_earnings']?.toString() ?? '0';
+        final totalRides = data['total_rides']?.toString() ?? '0';
+        final rating = data['rating_avg']?.toString() ?? '0';
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Earnings',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              // Total Earnings Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.primary, AppColors.primaryDark],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Total Earnings', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                    const SizedBox(height: 8),
+                    Text('₹$totalEarnings',
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Text('$totalRides rides completed',
+                        style: const TextStyle(color: Colors.white70)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildEarningCard('Today', '₹$todayEarnings', Icons.today, AppColors.success),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildEarningCard('This Week', '₹$weekEarnings', Icons.date_range, AppColors.warning),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // Rating
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.star, color: Colors.amber, size: 32),
+                  title: const Text('Rating'),
+                  trailing: Text('$rating / 5',
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEarningCard(String label, String amount, IconData icon, Color color) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 32),
+            const SizedBox(height: 8),
+            Text(amount, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(color: AppColors.textLight)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── PROFILE TAB ───
+  Widget _buildProfileTab(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Profile Header
+          Center(
+            child: Column(
+              children: [
+                CircleAvatar(
+                  radius: 48,
+                  backgroundColor: AppColors.primary,
+                  child: Text(
+                    _driverName.isNotEmpty ? _driverName[0].toUpperCase() : 'D',
+                    style: const TextStyle(fontSize: 36, color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(_driverName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _isOnline ? AppColors.success.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _isOnline ? 'Online' : 'Offline',
+                    style: TextStyle(
+                      color: _isOnline ? AppColors.success : Colors.grey,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // Ride History
+          const Text('Recent Rides', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+
+          FutureBuilder<Map<String, dynamic>>(
+            future: ApiService.getRideHistory(),
+            builder: (ctx, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Text('Error loading rides');
+              }
+              final rides = snapshot.data?['data']?['rides'] ??
+                  snapshot.data?['data']?['rows'] ?? [];
+              if (rides is! List || rides.isEmpty) {
+                return const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Center(child: Text('No rides yet')),
+                  ),
+                );
+              }
+              return Column(
+                children: rides.take(5).map<Widget>((ride) {
+                  final r = ride as Map<String, dynamic>;
+                  final status = r['status'] ?? '';
+                  final fare = r['total_fare']?.toString() ?? '--';
+                  final date = r['created_at'] ?? '';
+                  String dateStr = '';
+                  try {
+                    final dt = DateTime.parse(date);
+                    dateStr = DateFormat('MMM dd, HH:mm').format(dt);
+                  } catch (_) {
+                    dateStr = date;
+                  }
+                  return Card(
+                    child: ListTile(
+                      leading: Icon(
+                        status == 'completed' ? Icons.check_circle : Icons.cancel,
+                        color: status == 'completed' ? AppColors.success : Colors.red,
+                      ),
+                      title: Text('₹$fare', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text('$status • $dateStr'),
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+
+          const SizedBox(height: 24),
+
+          // Logout
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _logout,
+              icon: const Icon(Icons.logout, color: Colors.red),
+              label: const Text('Logout', style: TextStyle(color: Colors.red)),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                side: const BorderSide(color: Colors.red),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
 }
