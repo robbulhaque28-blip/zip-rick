@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Card, CardContent, TextField, Button, Grid, Switch, FormControlLabel, Divider } from '@mui/material';
+import { Box, Typography, Card, CardContent, TextField, Button, Grid, Switch, FormControlLabel, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { DeleteSweep } from '@mui/icons-material';
 
 const API = 'https://zip-rick-4.onrender.com/api/v1';
 
@@ -32,6 +33,9 @@ export default function SettingsPage() {
   });
   const [fee, setFee] = useState({ promotional: 499, standard: 999, promotion_active: true });
   const [commission, setCommission] = useState({ rate: 10 });
+  const [cleanupOpen, setCleanupOpen] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState('');
 
   useEffect(() => {
     const loadData = async () => {
@@ -61,6 +65,25 @@ export default function SettingsPage() {
   const saveCommission = async () => {
     try { await fetch(API + '/admin/settings/commission', { method: 'PUT', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(commission) }); setMsg('Commission saved!'); }
     catch (e) { setMsg('Failed to save'); }
+  };
+
+  const handleCleanup = async () => {
+    setCleaning(true);
+    setCleanupResult('');
+    try {
+      const res = await fetch(API + '/admin/cleanup', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+      const data = await res.json();
+      if (data.success) {
+        const d = data.data?.deleted || {};
+        setCleanupResult('Deleted: ' + Object.entries(d).filter(([k,v]) => v > 0).map(([k,v]) => `${k}: ${v}`).join(', '));
+      } else {
+        setCleanupResult('Cleanup failed');
+      }
+    } catch (e) {
+      setCleanupResult('Network error');
+    }
+    setCleaning(false);
+    setCleanupOpen(false);
   };
 
   return (
@@ -139,6 +162,42 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </Grid>
+
+        {/* Cleanup Database */}
+        <Grid item xs={12}>
+          <Card sx={{ border: '2px solid #f44336' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: '#f44336' }}>🗑️ Danger Zone - Reset Database</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                This will permanently delete all customers, drivers, rides, payments, documents, and all other data.
+                Admin users and system settings will be preserved.
+              </Typography>
+              {cleanupResult && (
+                <Typography sx={{ p: 1.5, bgcolor: '#E8F5E9', borderRadius: 2, mb: 2, color: '#2E7D32', fontSize: 13, wordBreak: 'break-word' }}>
+                  {cleanupResult}
+                </Typography>
+              )}
+              <Button variant="contained" color="error" startIcon={<DeleteSweep />} onClick={() => setCleanupOpen(true)} disabled={cleaning}>
+                {cleaning ? 'Cleaning...' : 'Delete All Test Data'}
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Dialog open={cleanupOpen} onClose={() => setCleanupOpen(false)}>
+          <DialogTitle sx={{ color: '#f44336', fontWeight: 700 }}>⚠️ Confirm Database Reset</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              This action <strong>cannot be undone</strong>. All customers, drivers, rides, payments, documents, support tickets, and other data will be permanently deleted. Only admin accounts and system settings will be kept.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setCleanupOpen(false)}>Cancel</Button>
+            <Button variant="contained" color="error" onClick={handleCleanup} disabled={cleaning}>
+              {cleaning ? 'Deleting...' : 'Yes, Delete Everything'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Grid>
     </Box>
   );

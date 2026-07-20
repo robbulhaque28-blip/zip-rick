@@ -374,4 +374,46 @@ router.get('/reports/revenue', asyncHandler(async (req, res) => {
   res.send(csv);
 }));
 
+// Cleanup - Delete all test data (keeps admin users and system settings)
+router.post('/cleanup', asyncHandler(async (req, res) => {
+  const { RatingReview, RideStatusLog, ChatMessage, SavedPlace, Referral, PromoRedemption, Notification, Transaction, Wallet, EmergencyContact, DriverDocument, DriverRegistrationPayment, Vehicle } = require('../models');
+  
+  const tables = [
+    { model: RatingReview },
+    { model: ChatMessage },
+    { model: RideStatusLog },
+    { model: Payment },
+    { model: SavedPlace },
+    { model: Referral },
+    { model: PromoRedemption },
+    { model: Notification },
+    { model: Transaction },
+    { model: EmergencyContact },
+    { model: DriverDocument },
+    { model: DriverRegistrationPayment },
+    { model: Vehicle },
+    { model: Ride },
+    { model: Driver },
+    { model: Customer },
+    { model: Wallet },
+  ];
+  
+  let deleted = {};
+  for (const t of tables) {
+    try {
+      const count = await t.model.destroy({ where: {}, truncate: false });
+      deleted[t.model.name] = count;
+    } catch (e) {
+      deleted[t.model.name] = 'Error: ' + e.message;
+    }
+  }
+  
+  // Delete non-admin users
+  const adminUserIds = (await AdminUser.findAll({ attributes: ['user_id'] })).map(a => a.user_id);
+  const nonAdminUsers = await User.destroy({ where: { id: { [Op.notIn]: adminUserIds } } });
+  deleted['User (non-admin)'] = nonAdminUsers;
+  
+  return success(res, { deleted }, 'Database cleaned. All test data removed.');
+}));
+
 module.exports = router;
