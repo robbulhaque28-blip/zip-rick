@@ -75,11 +75,32 @@ router.get("/earnings", asyncHandler(async (req, res) => {
 
 router.post("/toggle-online", asyncHandler(async (req, res) => {
   const driver = await Driver.findOne({ where: { user_id: req.userId } });
-  if (driver.registration_status !== "approved") throw new ApiError(403, "Not approved");
+  if (driver.registration_status !== "approved") throw new ApiError(403, "Your account is pending approval. Please wait for admin verification.");
   driver.is_online = !driver.is_online;
   driver.is_available = driver.is_online;
   await driver.save();
   return success(res, { is_online: driver.is_online });
+}));
+
+// Registration fee payment
+router.post("/registration/pay", asyncHandler(async (req, res) => {
+  const driver = await Driver.findOne({ where: { user_id: req.userId } });
+  if (!driver) throw new ApiError(404, "Driver not found");
+  if (driver.registration_fee_paid) return success(res, { message: "Already paid" }, "Already paid");
+  
+  driver.registration_fee_paid = true;
+  driver.registration_fee_amount = req.body.amount || 499;
+  await driver.save();
+  
+  const { DriverRegistrationPayment } = require("../models");
+  await DriverRegistrationPayment.create({
+    driver_id: driver.id,
+    amount: req.body.amount || 499,
+    payment_status: "completed",
+    payment_date: new Date(),
+  });
+  
+  return success(res, { message: "Payment successful", registration_fee_paid: true }, "Payment recorded");
 }));
 
 module.exports = router;

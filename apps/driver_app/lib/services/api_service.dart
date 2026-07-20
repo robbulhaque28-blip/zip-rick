@@ -142,6 +142,11 @@ class ApiService {
     return get('/support/tickets');
   }
 
+  // --- Registration Fee ---
+  static Future<Map<String, dynamic>> payRegistrationFee({int amount = 499}) {
+    return post('/drivers/registration/pay', {'amount': amount});
+  }
+
   // --- SOS ---
   static Future<Map<String, dynamic>> sendSOS(double lat, double lng) {
     return post('/sos', {'latitude': lat, 'longitude': lng, 'type': 'driver'});
