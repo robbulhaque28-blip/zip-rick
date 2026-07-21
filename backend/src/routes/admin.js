@@ -3,7 +3,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { asyncHandler, ApiError } = require('../middleware/errorHandler');
 const { success, paginated } = require('../utils/response');
 const { Op, literal } = require('sequelize');
-const { User, Driver, Customer, Ride, Payment, AdminUser, SystemSetting, PromoCode, SupportTicket, AuditLog, DriverRegistrationPayment } = require('../models');
+const { User, Driver, Customer, Ride, Payment, AdminUser, SystemSetting, PromoCode, SupportTicket, SupportTicketMessage, AuditLog, DriverRegistrationPayment, RatingReview, ChatMessage, RideStatusLog, PromoRedemption, Referral, SavedPlace, Notification, Transaction, Wallet, Vehicle, DriverDocument } = require('../models');
 
 router.use(authenticate);
 router.use(authorize('admin'));
@@ -376,44 +376,32 @@ router.get('/reports/revenue', asyncHandler(async (req, res) => {
 
 // Cleanup - Delete all test data (keeps admin users and system settings)
 router.post('/cleanup', asyncHandler(async (req, res) => {
-  const { RatingReview, RideStatusLog, ChatMessage, SavedPlace, Referral, PromoRedemption, Notification, Transaction, Wallet, EmergencyContact, DriverDocument, DriverRegistrationPayment, Vehicle } = require('../models');
+  const adminUserIds = (await AdminUser.findAll({ attributes: ['user_id'] })).map(a => a.user_id);
   
-  const tables = [
-    { model: RatingReview },
-    { model: ChatMessage },
-    { model: RideStatusLog },
-    { model: Payment },
-    { model: SavedPlace },
-    { model: Referral },
-    { model: PromoRedemption },
-    { model: Notification },
-    { model: Transaction },
-    { model: EmergencyContact },
-    { model: DriverDocument },
-    { model: DriverRegistrationPayment },
-    { model: Vehicle },
-    { model: Ride },
-    { model: Driver },
-    { model: Customer },
-    { model: Wallet },
-  ];
-  
-  let deleted = {};
-  for (const t of tables) {
-    try {
-      const count = await t.model.destroy({ where: {}, truncate: false });
-      deleted[t.model.name] = count;
-    } catch (e) {
-      deleted[t.model.name] = 'Error: ' + e.message;
-    }
-  }
+  // Delete in proper order to avoid foreign key conflicts
+  await RatingReview.destroy({ where: {} });
+  await ChatMessage.destroy({ where: {} });
+  await RideStatusLog.destroy({ where: {} });
+  await PromoRedemption.destroy({ where: {} });
+  await Referral.destroy({ where: {} });
+  await SavedPlace.destroy({ where: {} });
+  await Notification.destroy({ where: {} });
+  await Transaction.destroy({ where: {} });
+  await SupportTicketMessage.destroy({ where: {} });
+  await SupportTicket.destroy({ where: {} });
+  await Payment.destroy({ where: {} });
+  await DriverDocument.destroy({ where: {} });
+  await DriverRegistrationPayment.destroy({ where: {} });
+  await Vehicle.destroy({ where: {} });
+  await Ride.destroy({ where: {} });
+  await Wallet.destroy({ where: {} });
+  await Driver.destroy({ where: {} });
+  await Customer.destroy({ where: {} });
   
   // Delete non-admin users
-  const adminUserIds = (await AdminUser.findAll({ attributes: ['user_id'] })).map(a => a.user_id);
-  const nonAdminUsers = await User.destroy({ where: { id: { [Op.notIn]: adminUserIds } } });
-  deleted['User (non-admin)'] = nonAdminUsers;
+  const deletedUsers = await User.destroy({ where: { id: { [Op.notIn]: adminUserIds } } });
   
-  return success(res, { deleted }, 'Database cleaned. All test data removed.');
+  return success(res, { message: `Database cleaned. Deleted ${deletedUsers} non-admin users and all associated data.` }, 'Database cleaned');
 }));
 
 module.exports = router;
