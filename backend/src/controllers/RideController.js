@@ -78,12 +78,24 @@ module.exports = {
       commission_amount: commissionAmount,
       driver_earnings: driverEarnings,
       payment_method: req.body.payment_method,
+      scheduled_at: req.body.scheduled_at || null,
       status: 'pending'
     });
     await RideStatusLog.create({ ride_id: ride.id, previous_status: null, new_status: 'pending', changed_by: 'customer', changed_by_id: req.userId });
-    ride.status = 'searching'; await ride.save();
-    await RideStatusLog.create({ ride_id: ride.id, previous_status: 'pending', new_status: 'searching', changed_by: 'system' });
-    RideMatchingService.startSearch(ride, null, null);
+    
+    // Check if this is a scheduled ride
+    const isScheduled = req.body.scheduled_at && new Date(req.body.scheduled_at) > new Date();
+    if (isScheduled) {
+      ride.status = 'scheduled';
+      await ride.save();
+      await RideStatusLog.create({ ride_id: ride.id, previous_status: 'pending', new_status: 'scheduled', changed_by: 'customer' });
+      logger.info('Ride ' + ride.ride_number + ' scheduled for ' + req.body.scheduled_at);
+    } else {
+      ride.status = 'searching';
+      await ride.save();
+      await RideStatusLog.create({ ride_id: ride.id, previous_status: 'pending', new_status: 'searching', changed_by: 'system' });
+      RideMatchingService.startSearch(ride, null, null);
+    }
     if (promoCodeId) { const { PromoRedemption, PromoCode } = require('../models'); await PromoRedemption.create({ promo_code_id: promoCodeId, user_id: req.userId, ride_id: ride.id, discount_amount: promoDiscount }); await PromoCode.increment('usage_count', { where: { id: promoCodeId } }); }
     logger.info(`Ride ${ride.ride_number} booked`);
     return created(res, {
@@ -199,7 +211,7 @@ module.exports = {
   cancelRide: asyncHandler(async (req, res) => {
     const ride = await Ride.findByPk(req.params.id);
     if (!ride) throw new ApiError(404, 'Ride not found');
-    if (!['pending', 'searching', 'driver_assigned'].includes(ride.status)) throw new ApiError(400, 'Cannot cancel at this stage');
+    if (!['pending', 'searching', 'driver_assigned', 'scheduled'].includes(ride.status)) throw new ApiError(400, 'Cannot cancel at this stage');
     const oldStatus = ride.status;
     ride.status = 'cancelled';
     ride.cancellation_reason = req.body.reason || 'User cancelled';

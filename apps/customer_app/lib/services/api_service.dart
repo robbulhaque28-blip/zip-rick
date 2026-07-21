@@ -57,8 +57,10 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
-  Future<Map<String, dynamic>> bookRide(double pickupLat, double pickupLng, String pickupAddr, double dropLat, double dropLng, String dropAddr, String paymentMethod, String promoCode, {String rideMode = 'single'}) async {
-    final res = await http.post(Uri.parse(baseUrl + '/rides/book'), headers: await _headers(), body: jsonEncode({'pickup_latitude': pickupLat, 'pickup_longitude': pickupLng, 'pickup_address': pickupAddr, 'drop_latitude': dropLat, 'drop_longitude': dropLng, 'drop_address': dropAddr, 'route_distance': 5000, 'route_duration': 900, 'payment_method': paymentMethod, 'promo_code': promoCode, 'ride_mode': rideMode}));
+  Future<Map<String, dynamic>> bookRide(double pickupLat, double pickupLng, String pickupAddr, double dropLat, double dropLng, String dropAddr, String paymentMethod, String promoCode, {String rideMode = 'single', String? scheduledAt}) async {
+    final body = {'pickup_latitude': pickupLat, 'pickup_longitude': pickupLng, 'pickup_address': pickupAddr, 'drop_latitude': dropLat, 'drop_longitude': dropLng, 'drop_address': dropAddr, 'route_distance': 5000, 'route_duration': 900, 'payment_method': paymentMethod, 'promo_code': promoCode, 'ride_mode': rideMode};
+    if (scheduledAt != null) body['scheduled_at'] = scheduledAt;
+    final res = await http.post(Uri.parse(baseUrl + '/rides/book'), headers: await _headers(), body: jsonEncode(body));
     if (res.statusCode == 401) { await clearToken(); }
     return jsonDecode(res.body);
   }

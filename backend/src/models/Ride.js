@@ -38,9 +38,10 @@ Ride.init({
   commission_amount: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
   driver_earnings: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
   status: {
-    type: DataTypes.ENUM('pending', 'searching', 'driver_assigned', 'driver_arrived', 'started', 'completed', 'cancelled', 'no_driver_found'),
+    type: DataTypes.ENUM('scheduled', 'pending', 'searching', 'driver_assigned', 'driver_arrived', 'started', 'completed', 'cancelled', 'no_driver_found'),
     defaultValue: 'pending',
   },
+  scheduled_at: { type: DataTypes.DATE, allowNull: true },
   cancellation_reason: { type: DataTypes.TEXT, allowNull: true },
   cancelled_by: { type: DataTypes.ENUM('customer', 'driver', 'system', 'admin'), allowNull: true },
   cancelled_at: { type: DataTypes.DATE, allowNull: true },

@@ -5,6 +5,7 @@ const logger = require('./utils/logger');
 const { sequelize, testConnection } = require('./config/db');
 const { setupSocketIO } = require('./sockets');
 const { initializeFirebase } = require('./services/FirebaseService');
+const { startScheduler } = require('./services/SchedulerService');
 const server = http.createServer(app);
 const io = setupSocketIO(server);
 app.set('io', io);
@@ -16,6 +17,7 @@ async function start() {
   }
   initializeFirebase();
   if (config.env === 'development') await sequelize.sync({ alter: false });
+  startScheduler();
   server.listen(config.port, () => logger.info(`Zip-Rick API running on port ${config.port} [${config.env}]`));
 }
 start();

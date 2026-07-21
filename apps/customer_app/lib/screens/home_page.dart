@@ -26,6 +26,7 @@ class _HomePageState extends State<HomePage> {
   String? _appliedPromo;
   int _discount = 0;
   String _rideMode = 'single';
+  DateTime? _scheduledTime;
   List<Map<String, dynamic>> _savedPlaces = [];
 
   @override
@@ -193,7 +194,39 @@ class _HomePageState extends State<HomePage> {
             if (_discount > 0) ...[const Divider(height: 12), _fr("Discount", "-₹$_discount", color: Colors.green)],
             const Divider(height: 12), _fr("Total", "₹${amount - _discount}", bold: true),
           ])),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+        // Schedule ride toggle
+        Container(padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4), decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade200), borderRadius: BorderRadius.circular(12)),
+          child: Row(children: [
+            Expanded(child: GestureDetector(
+              onTap: () => setModal(() { _scheduledTime = null; }),
+              child: Container(padding: const EdgeInsets.symmetric(vertical: 10), decoration: BoxDecoration(
+                color: _scheduledTime == null ? const Color(0xFF6C63FF) : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(10)),
+                child: Text('Now', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: _scheduledTime == null ? Colors.white : Colors.black87, fontSize: 14)),
+              ),
+            )),
+            Expanded(child: GestureDetector(
+              onTap: () async {
+                final now = DateTime.now();
+                final pickedDate = await showDatePicker(context: context, initialDate: now.add(const Duration(hours: 1)), firstDate: now, lastDate: now.add(const Duration(hours: 24)));
+                if (pickedDate != null && ctx.mounted) {
+                  final pickedTime = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(now.add(const Duration(hours: 1))));
+                  if (pickedTime != null) {
+                    final dt = DateTime(pickedDate.year, pickedDate.month, pickedDate.day, pickedTime.hour, pickedTime.minute);
+                    setModal(() { _scheduledTime = dt; });
+                  }
+                }
+              },
+              child: Container(padding: const EdgeInsets.symmetric(vertical: 10), decoration: BoxDecoration(
+                color: _scheduledTime != null ? const Color(0xFF00D9A6) : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(10)),
+                child: Text('Schedule', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: _scheduledTime != null ? Colors.white : Colors.black87, fontSize: 14)),
+              ),
+            )),
+          ])),
+        if (_scheduledTime != null) Padding(padding: const EdgeInsets.only(top: 8, left: 4), child: Text('Scheduled for: ${_scheduledTime!.hour.toString().padLeft(2, '0')}:${_scheduledTime!.minute.toString().padLeft(2, '0')} on ${_scheduledTime!.day}/${_scheduledTime!.month}', style: const TextStyle(fontSize: 13, color: Color(0xFF00D9A6), fontWeight: FontWeight.w500))),
+        const SizedBox(height: 12),
         Row(children: [
           Expanded(child: TextField(controller: _promoCtrl, decoration: InputDecoration(labelText: "Promo", border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14)))),
           const SizedBox(width: 8),
@@ -222,7 +255,8 @@ class _HomePageState extends State<HomePage> {
     if (_pickupLoc == null || _dropLoc == null) return;
     setState(() => _isBooking = true);
     try {
-      final r = await _api.bookRide(_pickupLoc!.latitude, _pickupLoc!.longitude, _pickupCtrl.text, _dropLoc!.latitude, _dropLoc!.longitude, _dropCtrl.text, pm, _appliedPromo ?? "", rideMode: _rideMode);
+      final scheduledStr = _scheduledTime?.toIso8601String();
+      final r = await _api.bookRide(_pickupLoc!.latitude, _pickupLoc!.longitude, _pickupCtrl.text, _dropLoc!.latitude, _dropLoc!.longitude, _dropCtrl.text, pm, _appliedPromo ?? "", rideMode: _rideMode, scheduledAt: scheduledStr);
       if (r["success"]) { if (!mounted) return; Navigator.push(context, MaterialPageRoute(builder: (_) => RideTrackingPage(rideData: r["data"]["ride"]))); }
       else { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r["error"]?["message"] ?? "Booking failed"))); }
     } catch (_) {}
