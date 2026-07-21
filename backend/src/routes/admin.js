@@ -4,6 +4,7 @@ const { asyncHandler, ApiError } = require('../middleware/errorHandler');
 const { success, paginated } = require('../utils/response');
 const { Op, literal } = require('sequelize');
 const { User, Driver, Customer, Ride, Payment, AdminUser, SystemSetting, PromoCode, SupportTicket, AuditLog, DriverRegistrationPayment } = require('../models');
+const { sequelize } = require('../config/db');
 
 router.use(authenticate);
 router.use(authorize('admin'));
@@ -376,44 +377,39 @@ router.get('/reports/revenue', asyncHandler(async (req, res) => {
 
 // Cleanup - Delete all test data (keeps admin users and system settings)
 router.post('/cleanup', asyncHandler(async (req, res) => {
-  const { sequelize } = require('../models');
-  
   // Get admin user IDs to preserve
   const admins = await AdminUser.findAll({ attributes: ['user_id'] });
   const adminIds = admins.map(a => "'" + a.user_id + "'").join(',');
   
-  // Use raw SQL with CASCADE truncation
-  await sequelize.query('SET session_replication_role = replica;');
-  
-  const tables = [
-    'rating_reviews', 'chat_messages', 'ride_status_logs', 'promo_redemptions',
-    'referrals', 'saved_places', 'notifications', 'transactions',
-    'support_ticket_messages', 'support_tickets', 'payments',
-    'driver_documents', 'driver_registration_payments', 'vehicles',
-    'rides', 'wallets', 'drivers', 'customers'
-  ];
-  
-  const counts = {};
-  for (const table of tables) {
-    try {
-      const [result] = await sequelize.query(`DELETE FROM "${table}";`);
-      counts[table] = 'cleared';
-    } catch (e) {
-      counts[table] = 'Error: ' + e.message.substring(0, 50);
-    }
-  }
+  // Delete data in order to avoid FK issues
+  await sequelize.query(`DELETE FROM rating_reviews;`);
+  await sequelize.query(`DELETE FROM chat_messages;`);
+  await sequelize.query(`DELETE FROM ride_status_logs;`);
+  await sequelize.query(`DELETE FROM promo_redemptions;`);
+  await sequelize.query(`DELETE FROM referrals;`);
+  await sequelize.query(`DELETE FROM saved_places;`);
+  await sequelize.query(`DELETE FROM notifications;`);
+  await sequelize.query(`DELETE FROM transactions;`);
+  await sequelize.query(`DELETE FROM support_ticket_messages;`);
+  await sequelize.query(`DELETE FROM support_tickets;`);
+  await sequelize.query(`DELETE FROM payments;`);
+  await sequelize.query(`DELETE FROM driver_documents;`);
+  await sequelize.query(`DELETE FROM driver_registration_payments;`);
+  await sequelize.query(`DELETE FROM vehicles;`);
+  await sequelize.query(`DELETE FROM rides;`);
+  await sequelize.query(`DELETE FROM wallets;`);
+  await sequelize.query(`DELETE FROM drivers;`);
+  await sequelize.query(`DELETE FROM customers;`);
   
   // Delete non-admin users
   let deletedUsers = 0;
   if (adminIds) {
-    [deletedUsers] = await sequelize.query(`DELETE FROM "users" WHERE id NOT IN (${adminIds});`);
+    [deletedUsers] = await sequelize.query(`DELETE FROM users WHERE id NOT IN (${adminIds});`);
   } else {
-    [deletedUsers] = await sequelize.query(`DELETE FROM "users" WHERE role != 'admin';`);
+    [deletedUsers] = await sequelize.query(`DELETE FROM users WHERE role != 'admin';`);
   }
   
-  await sequelize.query('SET session_replication_role = origin;');
-  
-  return success(res, { message: `Database cleaned. Non-admin users deleted.` }, 'Database cleaned');
+  return success(res, { message: `Database cleaned. All test data removed.` }, 'Database cleaned');
 }));
 
 module.exports = router;
