@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Card, CardContent, TextField, Button, Grid, Switch, FormControlLabel, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
-import { DeleteSweep } from '@mui/icons-material';
+import { DeleteSweep, Sms } from '@mui/icons-material';
 
 const API = 'https://zip-rick-4.onrender.com/api/v1';
 
@@ -36,6 +36,8 @@ export default function SettingsPage() {
   const [cleanupOpen, setCleanupOpen] = useState(false);
   const [cleaning, setCleaning] = useState(false);
   const [cleanupResult, setCleanupResult] = useState('');
+  const [fast2smsKey, setFast2smsKey] = useState('');
+  const [fast2smsConfigured, setFast2smsConfigured] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -50,6 +52,13 @@ export default function SettingsPage() {
         if (regData.success && regData.data?.registration_fee) setFee(regData.data.registration_fee);
         if (cData.success && cData.data?.commission) setCommission(cData.data.commission);
       } catch (e) { console.log('Load error:', e); }
+    try {
+      const fsRes = await fetch(API + '/admin/settings/fast2sms', { headers: { Authorization: 'Bearer ' + token } });
+      const fsData = await fsRes.json();
+      if (fsData.success) {
+        setFast2smsConfigured(fsData.data?.configured || false);
+      }
+    } catch (e) {}
     };
     loadData();
   }, []);
@@ -65,6 +74,14 @@ export default function SettingsPage() {
   const saveCommission = async () => {
     try { await fetch(API + '/admin/settings/commission', { method: 'PUT', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(commission) }); setMsg('Commission saved!'); }
     catch (e) { setMsg('Failed to save'); }
+  };
+
+  const saveSmsKey = async () => {
+    if (!fast2smsKey || fast2smsKey.length < 10) { setMsg('Enter a valid Fast2SMS API key'); return; }
+    try {
+      await fetch(API + '/admin/settings/fast2sms', { method: 'PUT', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: fast2smsKey }) });
+      setMsg('Fast2SMS API key saved! Real OTP will now be sent.'); setFast2smsConfigured(true); setFast2smsKey('');
+    } catch (e) { setMsg('Failed to save'); }
   };
 
   const handleCleanup = async () => {
@@ -158,6 +175,26 @@ export default function SettingsPage() {
                   <Field label="Commission Rate (%)" value={commission.rate} onChange={e => setCommission({...commission, rate: parseFloat(e.target.value) || 10})} />
                 </div>
                 <Button variant="contained" onClick={saveCommission} sx={{ alignSelf: 'flex-start', mt: 1 }}>Save Commission</Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Fast2SMS Settings */}
+        <Grid item xs={12}>
+          <Card sx={{ border: fast2smsConfigured ? '2px solid #4CAF50' : '2px solid #FFA726' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: fast2smsConfigured ? '#4CAF50' : '#FFA726' }}>
+                <Sms sx={{ mr: 1, verticalAlign: 'middle' }} /> Fast2SMS - Real OTP
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                {fast2smsConfigured
+                  ? '✅ Fast2SMS is configured. Real SMS OTPs will be sent to users.'
+                  : 'Enter your Fast2SMS API key to send real OTPs via SMS. Get one at fast2sms.com'}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                <TextField fullWidth size="small" type="password" label="Fast2SMS API Key" value={fast2smsKey} onChange={e => setFast2smsKey(e.target.value)} placeholder="Enter your API key from fast2sms.com" />
+                <Button variant="contained" onClick={saveSmsKey} sx={{ minWidth: 120, height: 40, mt: 0.5 }}>Save Key</Button>
               </Box>
             </CardContent>
           </Card>

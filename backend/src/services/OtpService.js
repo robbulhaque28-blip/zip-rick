@@ -21,13 +21,22 @@ function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+async function getApiKey() {
+  try {
+    const { SystemSetting } = require('../models');
+    const s = await SystemSetting.findOne({ where: { key: 'fast2sms_api_key' } });
+    if (s && s.value && s.value !== 'your-fast2sms-api-key') return s.value;
+  } catch (e) {}
+  return config.sms.fast2smsApiKey;
+}
+
 /**
  * Send OTP via Fast2SMS
  * @param {string} phone - Phone number with country code (e.g., +919999999999)
  */
 async function sendOTP(phone) {
   const otp = generateOTP();
-  const apiKey = config.sms.fast2smsApiKey;
+  const apiKey = await getApiKey();
   
   // Always store OTP regardless of API key
   otpStore.set(phone, { otp, expiresAt: Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000 });

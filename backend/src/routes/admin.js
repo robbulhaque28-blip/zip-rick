@@ -289,6 +289,17 @@ router.get('/settings', asyncHandler(async (req, res) => {
   return success(res, { settings: f });
 }));
 
+// Fast2SMS Settings
+router.get('/settings/fast2sms', asyncHandler(async (req, res) => {
+  const s = await SystemSetting.findOne({ where: { key: 'fast2sms_api_key' } });
+  return success(res, { api_key: s?.value ? s.value.substring(0, 10) + '...' : '', configured: !!s?.value });
+}));
+router.put('/settings/fast2sms', asyncHandler(async (req, res) => {
+  if (!req.body.api_key || req.body.api_key.length < 10) throw new ApiError(400, 'Invalid API key');
+  await SystemSetting.upsert({ key: 'fast2sms_api_key', value: req.body.api_key, category: 'sms' });
+  return success(res, null, 'Fast2SMS API key saved! SMS OTP will now be sent.');
+}));
+
 router.get('/audit-logs', asyncHandler(async (req, res) => {
   const p = parseInt(req.query.page)||1, l = parseInt(req.query.limit)||50;
   const { rows, count } = await AuditLog.findAndCountAll({ order: [['created_at','DESC']], offset: (p-1)*l, limit: l });
