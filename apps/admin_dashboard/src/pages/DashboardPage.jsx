@@ -50,7 +50,21 @@ export default function DashboardPage() {
     revenue: parseFloat(d.total_revenue || 0),
   }));
   // If no data, show last 7 days with zeroes
-  if (chartData.length === 0) {
+  // Always show last 7 days with proper formatting
+  const last7Days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dayLabel = d.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' });
+    const match = chartData.find(x => {
+      const xDate = x.day.length === 10 ? new Date(x.day + 'T00:00:00') : null;
+      return xDate && xDate.toDateString() === d.toDateString();
+    });
+    last7Days.push({ day: dayLabel, revenue: match ? parseFloat(match.revenue || 0) : 0 });
+  }
+  chartData = last7Days;
+  
+  // Fallback if chartData is empty
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -102,7 +116,7 @@ export default function DashboardPage() {
 
       <Card>
         <CardContent>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Revenue (Last 30 Days)</Typography>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Revenue (Last 7 Days)</Typography>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />

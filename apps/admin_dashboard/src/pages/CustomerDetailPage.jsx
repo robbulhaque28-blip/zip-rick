@@ -104,6 +104,17 @@ export default function CustomerDetailPage() {
             </CardContent>
           </Card>
         </Grid>
+              </Grid>
+        <Grid item xs={12}>
+          <Card><CardContent>
+            <Button variant="contained" color="error" onClick={() => {
+              if (window.confirm("Delete this customer and all their data?")) {
+                const token = localStorage.getItem("admin_token");
+                fetch(API + "/admin/customers/" + id, { method: "DELETE", headers: { Authorization: "Bearer " + token } }).then(() => navigate("/customers"));
+              }
+            }}>Delete This Customer</Button>
+          </CardContent></Card>
+        </Grid>
       </Grid>
     </Box>
   );

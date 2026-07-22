@@ -137,19 +137,14 @@ export default function DriverDetailPage() {
     </Box>
   );
         <Grid item xs={12}>
-          <Card sx={{ border: '2px solid #f44336' }}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: '#f44336' }}>Delete Driver</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Permanently delete this driver and all their data. This cannot be undone!
-              </Typography>
-              <Button variant="contained" color="error" onClick={() => {
-                if (!window.confirm('Delete this driver and all their data?')) return;
-                const token = localStorage.getItem('admin_token');
-                fetch(API + '/admin/drivers/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } }).then(() => navigate('/drivers'));
-              }}>Delete Driver</Button>
-            </CardContent>
-          </Card>
+          <Card><CardContent>
+            <Button variant="contained" color="error" onClick={() => {
+              if (window.confirm("Delete this driver and all their data?")) {
+                const token = localStorage.getItem("admin_token");
+                fetch(API + "/admin/drivers/" + id, { method: "DELETE", headers: { Authorization: "Bearer " + token } }).then(() => navigate("/drivers"));
+              }
+            }}>Delete This Driver</Button>
+          </CardContent></Card>
         </Grid>
       </Grid>
     </Box>

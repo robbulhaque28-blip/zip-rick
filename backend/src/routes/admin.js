@@ -236,7 +236,16 @@ router.get('/promo-codes', asyncHandler(async (req, res) => {
 }));
 router.post('/promo-codes', asyncHandler(async (req, res) => {
   const a = await AdminUser.findOne({ where: { user_id: req.userId } });
-  const p = await PromoCode.create({ ...req.body, created_by: a?.id });
+  const data = {
+    code: req.body.code,
+    discount_value: req.body.discount_value || req.body.discount || 10,
+    discount_type: req.body.discount_type || 'percentage',
+    max_uses: req.body.max_uses || 100,
+    min_fare: req.body.min_fare || 0,
+    expires_at: req.body.expires_at || null,
+    created_by: a?.id,
+  };
+  const p = await PromoCode.create(data);
   return success(res, { promo_code: p }, 'Created');
 }));
 router.put('/promo-codes/:id', asyncHandler(async (req, res) => {
