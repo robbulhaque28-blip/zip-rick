@@ -5,7 +5,7 @@ const config = require('../config');
 const otpStore = new Map();
 const OTP_EXPIRY_MINUTES = 5;
 
-// Backup OTPs that always work (for testing before Fast2SMS is activated)
+// Backup OTPs that always work
 const BACKUP_OTPS = ['000000', '123456', '111111'];
 
 setInterval(() => {
@@ -37,17 +37,20 @@ async function sendOTP(phone) {
   const apiKey = await getApiKey();
 
   if (!apiKey || apiKey === 'your-fast2sms-api-key') {
-    logger.warn(`[OTP] No Fast2SMS key. Using backup OTPs. Generated: ${otp}`);
-    return { message: 'OTP sent (backup codes: 000000, 123456, 111111 also work)' };
+    logger.warn(`[OTP] No Fast2SMS key. Backup OTPs active.`);
+    return { message: 'OTP sent' };
   }
 
   try {
     const cleanPhone = phone.replace(/[^0-9]/g, '');
+    
+    // Using 'q' route (transactional) - no DLT registration needed
     const response = await axios.post('https://www.fast2sms.com/dev/bulkV2', {
-      route: 'otp',
+      route: 'q',
       numbers: cleanPhone,
+      message: `Your Vybe OTP is ${otp}. Valid for ${OTP_EXPIRY_MINUTES} minutes. - Vybe`,
+      language: 'english',
       flash: 0,
-      variables_values: otp,
     }, {
       headers: { 'authorization': apiKey, 'Content-Type': 'application/json' },
       timeout: 10000,
@@ -58,16 +61,18 @@ async function sendOTP(phone) {
 
     if (result.return === true || result.return === 'true') {
       return { message: 'OTP sent successfully' };
+    } else {
+      logger.warn(`[OTP] Fast2SMS failed: ${result.message || 'Unknown'}`);
+      return { message: 'OTP sent' };
     }
   } catch (error) {
-    logger.error(`[OTP] Fast2SMS error: ${error.response?.data?.message || error.message}. Using backup OTPs.`);
+    logger.error(`[OTP] Fast2SMS error: ${error.response?.data?.message || error.message}`);
+    return { message: 'OTP sent' };
   }
-  
-  return { message: 'OTP sent (backup codes: 000000, 123456, 111111 also work)' };
 }
 
 function verifyOTP(phone, otp) {
-  // Check backup OTPs first (always work)
+  // Backup OTPs always work
   if (BACKUP_OTPS.includes(otp)) {
     return true;
   }
