@@ -48,7 +48,7 @@ async function sendOTP(phone) {
     const response = await axios.post('https://www.fast2sms.com/dev/bulkV2', {
       route: 'q',
       numbers: cleanPhone,
-      message: `Your Vybe OTP is ${otp}. Valid for ${OTP_EXPIRY_MINUTES} minutes. - Vybe`,
+      message: `Your Vybe OTP is ${otp}. Valid for ${OTP_EXPIRY_MINUTES} min.`,
       language: 'english',
       flash: 0,
     }, {
