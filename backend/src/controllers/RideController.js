@@ -165,7 +165,7 @@ module.exports = {
       offset: (page - 1) * limit,
       limit
     });
-    return paginated(res, rows, count, page, limit, 'Ride history');
+    return success(res, { rides: rows, total: count }, 'Ride history');
   }),
   getSearchingRides: asyncHandler(async (req, res) => {
     const driver = await Driver.findOne({ where: { user_id: req.userId } });

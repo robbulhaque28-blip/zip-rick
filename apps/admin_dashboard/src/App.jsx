@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline, AppBar, Toolbar, Typography, Drawer, List, ListItem, ListItemIcon, ListItemText, Box, Button, Badge } from '@mui/material';
-import { Dashboard, PeopleAlt, DirectionsCar, Settings, SupportAgent, MonetizationOn, Notifications, CardGiftcard } from '@mui/icons-material';
+import { Dashboard, PeopleAlt, DirectionsCar, Settings, SupportAgent, MonetizationOn, Notifications, CardGiftcard, Download } from '@mui/icons-material';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import DriversPage from './pages/DriversPage';
@@ -12,6 +12,7 @@ import RidesPage from './pages/RidesPage';
 import SupportPage from './pages/SupportPage';
 import SettingsPage from './pages/SettingsPage';
 import PromoCodesPage from './pages/PromoCodesPage';
+import ReportsPage from './pages/ReportsPage';
 import NotificationsPage from './pages/NotificationsPage';
 
 const theme = createTheme({
@@ -33,6 +34,7 @@ function Layout() {
     { text: 'Support', icon: <Badge badgeContent="!" color="error"><SupportAgent /></Badge>, path: '/support' },
     { text: 'Promo Codes', icon: <CardGiftcard />, path: '/promo-codes' },
     { text: 'Notifications', icon: <Notifications />, path: '/notifications' },
+    { text: 'Reports', icon: <Download />, path: '/reports' },
     { text: 'Settings', icon: <Settings />, path: '/settings' },
   ];
   return (
@@ -64,6 +66,7 @@ function Layout() {
           <Route path="/rides" element={<RidesPage />} />
           <Route path="/support" element={<SupportPage />} />
           <Route path="/promo-codes" element={<PromoCodesPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/dashboard" />} />

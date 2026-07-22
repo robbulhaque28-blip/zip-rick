@@ -49,8 +49,17 @@ export default function DashboardPage() {
     day: d.date ? d.date.slice(5) : '',
     revenue: parseFloat(d.total_revenue || 0),
   }));
+  // If no data, show last 7 days with zeroes
   if (chartData.length === 0) {
-    ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(d => chartData.push({ day: d, revenue: 0 }));
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dayStr = d.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' });
+      chartData.push({ day: dayStr, revenue: 0 });
+    }
+  } else {
+    // Show last 7 days from real data
+    chartData = chartData.slice(-7);
   }
 
   return (

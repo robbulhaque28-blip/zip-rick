@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Box, Typography, Card, CardContent, Grid, Chip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, CircularProgress } from '@mui/material';
 import { ArrowBack } from '@mui/icons-material';
@@ -136,13 +136,23 @@ export default function DriverDetailPage() {
       </Grid>
     </Box>
   );
-}
-
-function InfoRow({ label, value }) {
-  return (
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5, borderBottom: '1px solid #f0f0f0' }}>
-      <Typography variant="body2" color="text.secondary">{label}</Typography>
-      <Typography variant="body2" sx={{ fontWeight: 500 }}>{value}</Typography>
+        <Grid item xs={12}>
+          <Card sx={{ border: '2px solid #f44336' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: '#f44336' }}>Delete Driver</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Permanently delete this driver and all their data. This cannot be undone!
+              </Typography>
+              <Button variant="contained" color="error" onClick={() => {
+                if (!window.confirm('Delete this driver and all their data?')) return;
+                const token = localStorage.getItem('admin_token');
+                fetch(API + '/admin/drivers/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } }).then(() => navigate('/drivers'));
+              }}>Delete Driver</Button>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
     </Box>
   );
 }
+function InfoRow

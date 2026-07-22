@@ -423,4 +423,28 @@ router.post('/cleanup', asyncHandler(async (req, res) => {
   return success(res, { message: `Database cleaned. All test data removed.` }, 'Database cleaned');
 }));
 
+
+// Delete a specific customer
+router.delete('/customers/:id', asyncHandler(async (req, res) => {
+  const c = await Customer.findByPk(req.params.id);
+  if (!c) throw new ApiError(404, 'Customer not found');
+  const userId = c.user_id;
+  await c.destroy();
+  await User.destroy({ where: { id: userId } });
+  return success(res, null, 'Customer deleted');
+}));
+
+// Delete a specific driver
+router.delete('/drivers/:id', asyncHandler(async (req, res) => {
+  const d = await Driver.findByPk(req.params.id);
+  if (!d) throw new ApiError(404, 'Driver not found');
+  const userId = d.user_id;
+  await DriverDocument.destroy({ where: { driver_id: d.id } });
+  await DriverRegistrationPayment.destroy({ where: { driver_id: d.id } });
+  await Vehicle.destroy({ where: { driver_id: d.id } });
+  await d.destroy();
+  await User.destroy({ where: { id: userId } });
+  return success(res, null, 'Driver deleted');
+}));
+
 module.exports = router;

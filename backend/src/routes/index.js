@@ -154,6 +154,7 @@ router.post('/referral/apply', authenticate, async (req, res) => {
     await customer.save();
 
     referrer.loyalty_points = (referrer.loyalty_points || 0) + 100;
+    referrer.referral_discount_earned = parseFloat((referrer.referral_discount_earned || 0) + (referrer.total_spent || 0) * 0.10).toFixed(2);
     await referrer.save();
 
     await Referral.create({
