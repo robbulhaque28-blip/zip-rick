@@ -3,13 +3,19 @@ const config = require('../config');
 const { User, Customer, Driver, AdminUser, Wallet } = require('../models');
 const { generateTokens } = require('../middleware/auth');
 const { ApiError } = require('../middleware/errorHandler');
+const OtpService = require('./OtpService');
 
 class AuthService {
-  async sendOTP(phone) { return { message: 'OTP sent', phone }; }
+  async sendOTP(phone) {
+    const result = await OtpService.sendOTP(phone);
+    return result;
+  }
 
   async verifyOTP(phone, otp, role = 'customer', fullName = null) {
-    let user = await User.findOne({ where: { phone } });
+    // Verify OTP
+    OtpService.verifyOTP(phone, otp);
 
+    let user = await User.findOne({ where: { phone } });
     if (!user) {
       if (!fullName || fullName.trim() === '') throw new ApiError(400, 'Name is required');
       user = await User.create({ phone, full_name: fullName, role, is_phone_verified: true });

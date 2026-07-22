@@ -36,6 +36,10 @@ const config = Object.freeze({
   googleMaps: {
     apiKey: process.env.GOOGLE_MAPS_API_KEY || '',
   },
+  sms: {
+    fast2smsApiKey: process.env.FAST2SMS_API_KEY || 'your-fast2sms-api-key',
+    fast2smsSenderId: process.env.FAST2SMS_SENDER_ID || 'VYBE',
+  },
   logging: { level: process.env.LOG_LEVEL || 'debug', dir: './logs' },
   corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : ['http://localhost:3000', 'http://localhost:5173', 'https://zip-rick-admin.onrender.com'],
   rateLimit: {
