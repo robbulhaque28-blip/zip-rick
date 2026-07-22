@@ -1,6 +1,6 @@
 const http = require('http');
 
-const loginData = JSON.stringify({ email: 'admin@zip-rick.com', password: 'admin123' });
+const loginData = JSON.stringify({ email: 'admin@vybe.com', password: 'admin123' });
 const loginReq = http.request({ hostname: 'localhost', port: 3000, path: '/api/v1/auth/admin/login', method: 'POST', headers: { 'Content-Type': 'application/json' } }, (res) => {
   let body = '';
   res.on('data', d => body += d);

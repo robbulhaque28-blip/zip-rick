@@ -1,4 +1,4 @@
-# Zip-Rick Production Readiness Checklist
+# Vybe Production Readiness Checklist
 
 ## Pre-Launch Verification
 
@@ -9,7 +9,7 @@
 - [ ] ElastiCache Redis cluster created
 - [ ] S3 buckets created with proper policies
 - [ ] SSL/TLS certificates issued and installed
-- [ ] Domain names configured (api.zip-rick.com, admin.zip-rick.com)
+- [ ] Domain names configured (api.vybe.com, admin.vybe.com)
 - [ ] CDN (CloudFront) configured for static assets
 - [ ] Load balancer (ALB) configured with health checks
 - [ ] Auto-scaling groups configured (min 2, max 10)

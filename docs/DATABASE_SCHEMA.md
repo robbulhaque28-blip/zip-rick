@@ -1,4 +1,4 @@
-# Zip-Rick Database Schema
+# Vybe Database Schema
 
 ## Entity Relationship Overview
 

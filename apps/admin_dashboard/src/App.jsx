@@ -39,7 +39,7 @@ function Layout() {
     <Box sx={{ display: 'flex' }}>
       <AppBar position="fixed" sx={{ zIndex: 1201, backgroundColor: '#1A1D26' }}>
         <Toolbar>
-          <Typography variant="h6" noWrap sx={{ flexGrow: 1, fontWeight: 700 }}>Zip-Rick Admin</Typography>
+          <Typography variant="h6" noWrap sx={{ flexGrow: 1, fontWeight: 700 }}>Vybe Admin</Typography>
           <Button color="inherit" onClick={() => { localStorage.removeItem('admin_token'); window.location.href = '/login'; }}>Logout</Button>
         </Toolbar>
       </AppBar>

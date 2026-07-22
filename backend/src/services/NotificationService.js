@@ -49,7 +49,7 @@ class NotificationService {
           android: {
             priority: 'high',
             notification: {
-              channel_id: 'zip_rick_' + type,
+              channel_id: 'vybe_' + type,
               sound: 'default',
             },
           },
@@ -211,7 +211,7 @@ class NotificationService {
     return this.sendPush(
       customerId,
       'Ride Completed',
-      `Thank you for riding with Zip-Rick! Please rate your experience.`,
+      `Thank you for riding with Vybe! Please rate your experience.`,
       { type: 'ride_completed', ride_id: rideData.id, screen: 'rate_ride' },
       'ride_completed'
     );
@@ -221,7 +221,7 @@ class NotificationService {
     return this.sendPush(
       driverId,
       'Registration Approved',
-      'Congratulations! Your Zip-Rick driver account has been approved. Start earning now!',
+      'Congratulations! Your Vybe driver account has been approved. Start earning now!',
       { type: 'driver_approved', screen: 'driver_home' },
       'driver_approved'
     );

@@ -1,6 +1,6 @@
 {
-    "name": "zip_rick_customer",
-    "short_name": "zip_rick_customer",
+    "name": "vybe_customer",
+    "short_name": "vybe_customer",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

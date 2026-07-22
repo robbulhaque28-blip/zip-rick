@@ -32,7 +32,7 @@ export default function LoginPage() {
       <Card sx={{ maxWidth: 420, width: '100%', mx: 2 }}>
         <CardContent sx={{ p: 4 }}>
           <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>Zip-Rick Admin</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>Vybe Admin</Typography>
             <Typography variant="body2" color="text.secondary">Sign in to manage your platform</Typography>
           </Box>
           {error && <Typography color="error" sx={{ mb: 2, textAlign: 'center' }}>{error}</Typography>}

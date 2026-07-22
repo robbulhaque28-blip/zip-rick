@@ -7,12 +7,12 @@ const bcrypt = require('bcryptjs');
   const [cols] = await s.query("PRAGMA table_info('admin_users')");
   const names = cols.map(c => c.name);
   if (names.includes('password_hash')) {
-    await s.query("INSERT INTO admin_users(id,user_id,email,password_hash,role,is_active,created_at,updated_at) VALUES('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','admin@zip-rick.com','" + h + "','super_admin',1,datetime('now'),datetime('now'))");
+    await s.query("INSERT INTO admin_users(id,user_id,email,password_hash,role,is_active,created_at,updated_at) VALUES('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','admin@vybe.com','" + h + "','super_admin',1,datetime('now'),datetime('now'))");
     console.log('Admin created with password_hash');
   } else {
-    await s.query("INSERT INTO admin_users(id,user_id,username,email,password,role,status,created_at,updated_at) VALUES('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','admin','admin@zip-rick.com','" + h + "','super_admin','active',datetime('now'),datetime('now'))");
+    await s.query("INSERT INTO admin_users(id,user_id,username,email,password,role,status,created_at,updated_at) VALUES('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','admin','admin@vybe.com','" + h + "','super_admin','active',datetime('now'),datetime('now'))");
     console.log('Admin created with password field');
   }
-  console.log('Login: admin@zip-rick.com / admin123');
+  console.log('Login: admin@vybe.com / admin123');
   process.exit(0);
 })();

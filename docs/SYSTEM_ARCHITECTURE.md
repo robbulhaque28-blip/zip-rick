@@ -1,4 +1,4 @@
-# Zip-Rick System Architecture
+# Vybe System Architecture
 
 ## Overview
 Production-grade E-Rickshaw ride-hailing platform. India-first, Assam launch.

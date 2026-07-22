@@ -18,7 +18,7 @@ async function start() {
   initializeFirebase();
   if (config.env === 'development') await sequelize.sync({ alter: false });
   startScheduler();
-  server.listen(config.port, () => logger.info(`Zip-Rick API running on port ${config.port} [${config.env}]`));
+  server.listen(config.port, () => logger.info(`Vybe API running on port ${config.port} [${config.env}]`));
 }
 start();
 function gracefulShutdown(signal) {

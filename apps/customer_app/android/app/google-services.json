@@ -1,15 +1,15 @@
 {
   "project_info": {
     "project_number": "213289856079",
-    "project_id": "zip-rick",
-    "storage_bucket": "zip-rick.firebasestorage.app"
+    "project_id": "vybe",
+    "storage_bucket": "vybe.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
         "mobilesdk_app_id": "1:213289856079:android:583029ff056a935df7ce3a",
         "android_client_info": {
-          "package_name": "com.ziprick.customer"
+          "package_name": "com.vybe.customer"
         }
       },
       "oauth_client": [],

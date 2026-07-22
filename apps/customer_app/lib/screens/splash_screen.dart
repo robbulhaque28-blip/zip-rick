@@ -24,7 +24,7 @@ class _SplashScreenState extends State<SplashScreen> {
     body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       Icon(Icons.electric_rickshaw_rounded, size: 120, color: Colors.white),
       SizedBox(height: 24),
-      Text("Zip-Rick", style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)),
+      Text("Vybe", style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)),
       SizedBox(height: 8),
       Text("Your E-Rickshaw, Instantly", style: TextStyle(color: Colors.white70, fontSize: 16)),
       SizedBox(height: 60),

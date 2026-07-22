@@ -22,7 +22,7 @@ class _ReferralPageState extends State<ReferralPage> {
     } catch (_) { setState(() => _loading = false); }
   }
 
-  void _invite() { if (_code == null) return; Clipboard.setData(ClipboardData(text: "Join Zip-Rick! Use my code: $_code")); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Copied!"))); }
+  void _invite() { if (_code == null) return; Clipboard.setData(ClipboardData(text: "Join Vybe! Use my code: $_code")); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Copied!"))); }
 
   Future<void> _apply() async {
     if (_referCtrl.text.isEmpty) return;

@@ -1,7 +1,7 @@
 {
-  "name": "zip-rick-backend",
+  "name": "vybe-backend",
   "version": "1.0.0",
-  "description": "Zip-Rick E-Rickshaw Ride-Hailing Platform Backend API",
+  "description": "Vybe E-Rickshaw Ride-Hailing Platform Backend API",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

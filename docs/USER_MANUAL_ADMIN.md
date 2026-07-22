@@ -1,8 +1,8 @@
-# Zip-Rick Admin Dashboard User Manual
+# Vybe Admin Dashboard User Manual
 
 ## Accessing the Dashboard
 
-1. Open your browser and go to `https://admin.zip-rick.com`
+1. Open your browser and go to `https://admin.vybe.com`
 2. Enter your **Email** and **Password**
 3. Click **"Sign In"**
 4. You'll be redirected to the main dashboard

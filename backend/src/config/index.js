@@ -11,7 +11,7 @@ const config = Object.freeze({
     dialect: process.env.DB_DIALECT || 'postgres',
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT, 10) || 5432,
-    name: process.env.DB_NAME || 'zip_rick',
+    name: process.env.DB_NAME || 'vybe',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
     logging: process.env.NODE_ENV === 'development' ? console.log : false,

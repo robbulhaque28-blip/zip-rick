@@ -75,7 +75,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _searchPlaces(String q, bool isPickup) async {
     if (q.length < 3) { setState(() => _searchResults = []); return; }
     try {
-      final r = await http.get(Uri.parse("https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(q)}&format=json&limit=5&countrycodes=in"), headers: {"User-Agent": "ZipRick/1.0"});
+      final r = await http.get(Uri.parse("https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(q)}&format=json&limit=5&countrycodes=in"), headers: {"User-Agent": "Vybe/1.0"});
       if (r.statusCode == 200) {
         final List d = jsonDecode(r.body);
         setState(() { _searchResults = d.map((e) => {"display_name": e["display_name"] ?? "", "lat": double.parse(e["lat"] ?? "0"), "lon": double.parse(e["lon"] ?? "0"), "isPickup": isPickup}).toList(); });
@@ -275,7 +275,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   @override Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text("Zip-Rick", style: TextStyle(fontWeight: FontWeight.bold)),
+    appBar: AppBar(title: const Text("Vybe", style: TextStyle(fontWeight: FontWeight.bold)),
       backgroundColor: Colors.transparent, elevation: 0,
       actions: [
         Container(margin: const EdgeInsets.only(right: 4), decoration: BoxDecoration(color: const Color(0xFF6C63FF).withOpacity(0.1), shape: BoxShape.circle),
@@ -289,7 +289,7 @@ class _HomePageState extends State<HomePage> {
         : FlutterMap(mapController: _mapCtrl, options: MapOptions(center: _currentLoc ?? const LatLng(0, 0), zoom: 15, onLongPress: (tapPos, latlng) {
             setState(() { if (_dropLoc == null) { _dropLoc = latlng; _dropCtrl.text = "Pinned"; } else { _pickupLoc = latlng; _pickupCtrl.text = "Pinned"; _dropLoc = null; _dropCtrl.clear(); } });
           }), children: [
-            TileLayer(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", userAgentPackageName: "com.ziprick.customer"),
+            TileLayer(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", userAgentPackageName: "com.vybe.customer"),
             MarkerLayer(markers: [
               if (_pickupLoc != null) Marker(point: _pickupLoc!, width: 40, height: 40, child: const Icon(Icons.location_on, color: Colors.green, size: 35)),
               if (_dropLoc != null) Marker(point: _dropLoc!, width: 40, height: 40, child: const Icon(Icons.location_on, color: Colors.red, size: 35)),

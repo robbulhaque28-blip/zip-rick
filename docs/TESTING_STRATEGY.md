@@ -1,4 +1,4 @@
-# Zip-Rick Testing Strategy
+# Vybe Testing Strategy
 
 ## Testing Pyramid
 
@@ -162,7 +162,7 @@ export const options = {
 };
 
 export default function () {
-  const res = http.get('https://api.zip-rick.com/v1/health');
+  const res = http.get('https://api.vybe.com/v1/health');
   check(res, { 'status is 200': (r) => r.status === 200 });
   sleep(1);
 }

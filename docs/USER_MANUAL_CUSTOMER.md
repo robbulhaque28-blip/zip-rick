@@ -1,15 +1,15 @@
-# Zip-Rick Customer App User Manual
+# Vybe Customer App User Manual
 
 ## Getting Started
 
 ### 1. Download & Install
-- **Android**: Download from Google Play Store - search "Zip-Rick"
-- **iOS**: Download from Apple App Store - search "Zip-Rick"
+- **Android**: Download from Google Play Store - search "Vybe"
+- **iOS**: Download from Apple App Store - search "Vybe"
 
 ### 2. Account Registration
 
 #### Login via OTP
-1. Open the Zip-Rick app
+1. Open the Vybe app
 2. Enter your mobile number (with country code: +91 for India)
 3. Tap **"Send OTP"**
 4. Enter the 6-digit OTP received via SMS
@@ -69,7 +69,7 @@ You can set your pickup location using any of these methods:
 ### Step 5: Book Your Ride
 1. Review fare and route
 2. Select payment method: **Cash** or **UPI**
-3. Tap **"Book Zip-Rick"**
+3. Tap **"Book Vybe"**
 4. Wait while we find a nearby driver
 
 ---
@@ -96,7 +96,7 @@ You can set your pickup location using any of these methods:
 1. Tap the **SOS** button (red icon)
 2. Confirm emergency
 3. Alert is sent to:
-   - Zip-Rick security team
+   - Vybe security team
    - Your emergency contacts
    - (Optional: local authorities)
 4. Live location is shared with responders

@@ -1,4 +1,4 @@
-# zip_rick_customer
+# vybe_customer
 
 A new Flutter project.
 

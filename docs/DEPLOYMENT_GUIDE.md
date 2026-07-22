@@ -1,10 +1,10 @@
-# Zip-Rick Deployment Guide
+# Vybe Deployment Guide
 
 ## Prerequisites
 
 ### Production Environment
 - AWS Account with admin access
-- Domain name (zip-rick.com)
+- Domain name (vybe.com)
 - SSL certificates (AWS Certificate Manager)
 - Docker & Docker Compose (for containerized deployment)
 - Node.js 18+ (for direct deployment)
@@ -61,8 +61,8 @@ Task Definition:
 
 ### 1.5 S3 Buckets
 ```
-zip-rick-documents/ (driver documents)
-zip-rick-uploads/ (general uploads)
+vybe-documents/ (driver documents)
+vybe-uploads/ (general uploads)
 Lifecycle: 90-day transition to Glacier
 ```
 
@@ -72,7 +72,7 @@ Lifecycle: 90-day transition to Glacier
 
 ### 2.1 Environment Variables
 
-Create `/home/user/zip-rick/backend/.env.production`:
+Create `/home/user/vybe/backend/.env.production`:
 
 ```env
 NODE_ENV=production
@@ -80,16 +80,16 @@ PORT=4000
 API_PREFIX=/api/v1
 
 # Database
-DB_HOST=zip-rick-db.cluster-xxxxx.ap-south-1.rds.amazonaws.com
+DB_HOST=vybe-db.cluster-xxxxx.ap-south-1.rds.amazonaws.com
 DB_PORT=5432
-DB_NAME=zip_rick_prod
-DB_USER=ziprick_admin
+DB_NAME=vybe_prod
+DB_USER=vybe_admin
 DB_PASSWORD=<secure-password>
 DB_POOL_MAX=20
 DB_POOL_MIN=5
 
 # Redis
-REDIS_HOST=zip-rick-redis.xxxxx.ng.0001.apse1.cache.amazonaws.com
+REDIS_HOST=vybe-redis.xxxxx.ng.0001.apse1.cache.amazonaws.com
 REDIS_PORT=6379
 
 # JWT
@@ -99,9 +99,9 @@ JWT_REFRESH_SECRET=<64-char-random-hex>
 JWT_REFRESH_EXPIRES_IN=7d
 
 # Firebase
-FIREBASE_PROJECT_ID=zip-rick-production
+FIREBASE_PROJECT_ID=vybe-production
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n..."
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk@zip-rick-production.iam.gserviceaccount.com
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk@vybe-production.iam.gserviceaccount.com
 
 # Google Maps
 GOOGLE_MAPS_API_KEY=AIzaSy...
@@ -114,11 +114,11 @@ RAZORPAY_KEY_SECRET=<secret>
 AWS_REGION=ap-south-1
 AWS_ACCESS_KEY_ID=AKIA...
 AWS_SECRET_ACCESS_KEY=<secret>
-AWS_S3_BUCKET=zip-rick-uploads
-AWS_S3_BUCKET_DOCUMENTS=zip-rick-documents
+AWS_S3_BUCKET=vybe-uploads
+AWS_S3_BUCKET_DOCUMENTS=vybe-documents
 
 # CORS
-CORS_ORIGINS=https://admin.zip-rick.com,https://www.zip-rick.com
+CORS_ORIGINS=https://admin.vybe.com,https://www.vybe.com
 
 # Sentry
 SENTRY_DSN=https://xxxxx@sentry.io/xxxxx
@@ -149,28 +149,28 @@ NODE_ENV=production npx sequelize-cli db:seed:all
 
 ```bash
 # Build image
-docker build -t zip-rick-api:latest -f docker/Dockerfile backend/
+docker build -t vybe-api:latest -f docker/Dockerfile backend/
 
 # Tag and push to ECR
 aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin <account>.dkr.ecr.ap-south-1.amazonaws.com
-docker tag zip-rick-api:latest <account>.dkr.ecr.ap-south-1.amazonaws.com/zip-rick-api:latest
-docker push <account>.dkr.ecr.ap-south-1.amazonaws.com/zip-rick-api:latest
+docker tag vybe-api:latest <account>.dkr.ecr.ap-south-1.amazonaws.com/vybe-api:latest
+docker push <account>.dkr.ecr.ap-south-1.amazonaws.com/vybe-api:latest
 
 # Deploy to ECS
-aws ecs update-service --cluster zip-rick-prod --service zip-rick-api --force-new-deployment
+aws ecs update-service --cluster vybe-prod --service vybe-api --force-new-deployment
 ```
 
 ### 4.2 Direct Deployment (EC2)
 
 ```bash
 # Copy files to server
-rsync -avz --exclude 'node_modules' --exclude '.env' backend/ ubuntu@<server-ip>:/opt/zip-rick/
+rsync -avz --exclude 'node_modules' --exclude '.env' backend/ ubuntu@<server-ip>:/opt/vybe/
 
 # Install PM2 globally
 npm install -g pm2
 
 # Start with PM2 cluster mode
-pm2 start src/server.js -i max --name "zip-rick-api"
+pm2 start src/server.js -i max --name "vybe-api"
 
 # Save PM2 config
 pm2 save
@@ -185,7 +185,7 @@ cd apps/admin_dashboard
 npm run build
 
 # Copy to S3
-aws s3 sync build/ s3://zip-rick-admin
+aws s3 sync build/ s3://vybe-admin
 
 # Invalidate CloudFront
 aws cloudfront create-invalidation --distribution-id <id> --paths "/*"
@@ -198,11 +198,11 @@ aws cloudfront create-invalidation --distribution-id <id> --paths "/*"
 ```bash
 # Using AWS Certificate Manager (ACM) - for ALB/CloudFront
 # Request certificate for:
-#   *.zip-rick.com
-#   zip-rick.com
+#   *.vybe.com
+#   vybe.com
 
 # Using Let's Encrypt (direct EC2)
-sudo certbot --nginx -d api.zip-rick.com -d admin.zip-rick.com
+sudo certbot --nginx -d api.vybe.com -d admin.vybe.com
 ```
 
 ---
@@ -305,16 +305,16 @@ Sentry.init({
 ### 8.1 Database Backup
 ```bash
 # Daily backup
-pg_dump -h $DB_HOST -U $DB_USER -d $DB_NAME -F c -f /backups/zip-rick-$(date +%Y%m%d).dump
+pg_dump -h $DB_HOST -U $DB_USER -d $DB_NAME -F c -f /backups/vybe-$(date +%Y%m%d).dump
 
 # Upload to S3
-aws s3 cp /backups/zip-rick-$(date +%Y%m%d).dump s3://zip-rick-backups/db/
+aws s3 cp /backups/vybe-$(date +%Y%m%d).dump s3://vybe-backups/db/
 ```
 
 ### 8.2 Recovery
 ```bash
 # Restore from backup
-pg_restore -h $DB_HOST -U $DB_USER -d $DB_NAME -c /backups/zip-rick-20260705.dump
+pg_restore -h $DB_HOST -U $DB_USER -d $DB_NAME -c /backups/vybe-20260705.dump
 ```
 
 ### 8.3 RTO/RPO

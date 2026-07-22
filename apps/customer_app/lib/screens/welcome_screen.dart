@@ -9,7 +9,7 @@ class WelcomeScreen extends StatelessWidget {
       Container(width: 120, height: 120, decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
         child: const Icon(Icons.electric_rickshaw_rounded, size: 60, color: Colors.white)),
       const SizedBox(height: 24),
-      const Text("Zip-Rick", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
+      const Text("Vybe", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
       const SizedBox(height: 8),
       const Text("Your E-Rickshaw, Instantly", style: TextStyle(color: Colors.white70, fontSize: 16)),
       const Spacer(flex: 2),

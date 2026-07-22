@@ -6,7 +6,7 @@ async function createAdmin() {
     // First create a regular user
     const user = await User.create({
       id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-      email: 'admin@zip-rick.com',
+      email: 'admin@vybe.com',
       phone: '+1234567890',
       name: 'Admin User',
       status: 'active'
@@ -19,14 +19,14 @@ async function createAdmin() {
     const admin = await AdminUser.create({
       id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
       user_id: user.id,
-      email: 'admin@zip-rick.com',
+      email: 'admin@vybe.com',
       password_hash: hash,
       role: 'super_admin',
       is_active: true
     });
     
     console.log('✅ Admin created successfully!');
-    console.log('Email: admin@zip-rick.com');
+    console.log('Email: admin@vybe.com');
     console.log('Password: admin123');
     
   } catch (error) {

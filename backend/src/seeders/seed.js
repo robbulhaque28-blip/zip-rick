@@ -35,14 +35,14 @@ async function seed() {
       if (!existingAdmin || existingAdmin.length === 0) {
         await sequelize.query(
           `INSERT INTO admin_users (id, user_id, email, password_hash, role, permissions, is_active, created_at, updated_at)
-           VALUES ('${adminId}', '${user[0].id}', 'admin@ziprick.com', '${password}', 'super_admin', '{"all": true}', true, NOW(), NOW());`
+           VALUES ('${adminId}', '${user[0].id}', 'admin@vybe.com', '${password}', 'super_admin', '{"all": true}', true, NOW(), NOW());`
         );
         console.log('✅ Admin user created!');
       } else {
         console.log('ℹ️  Admin user already exists.');
       }
 
-      console.log('   Email:    admin@ziprick.com');
+      console.log('   Email:    admin@vybe.com');
       console.log('   Password: Admin@123');
       console.log('   Phone:    7000000000');
     }

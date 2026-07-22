@@ -8,10 +8,10 @@ const config = require('../config');
 const swaggerDefinition = {
   openapi: '3.0.0',
   info: {
-    title: 'Zip-Rick API',
+    title: 'Vybe API',
     version: '1.0.0',
     description: `
-      Zip-Rick Ride-Hailing Platform API
+      Vybe Ride-Hailing Platform API
       
       A production-grade ride-hailing platform exclusively for E-Rickshaws.
       
@@ -30,8 +30,8 @@ const swaggerDefinition = {
       \`\`\`
     `,
     contact: {
-      name: 'Zip-Rick Support',
-      email: 'support@zip-rick.com',
+      name: 'Vybe Support',
+      email: 'support@vybe.com',
     },
   },
   servers: [
@@ -40,7 +40,7 @@ const swaggerDefinition = {
       description: 'Development server',
     },
     {
-      url: 'https://api.zip-rick.com/v1',
+      url: 'https://api.vybe.com/v1',
       description: 'Production server',
     },
   ],

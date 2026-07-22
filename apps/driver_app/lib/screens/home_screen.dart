@@ -156,7 +156,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   }
 
   @override Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(_hasActiveRide ? 'Active Ride' : 'Zip-Rick Driver'), backgroundColor: const Color(0xFF6C63FF), foregroundColor: Colors.white,
+    appBar: AppBar(title: Text(_hasActiveRide ? 'Active Ride' : 'Vybe Driver'), backgroundColor: const Color(0xFF6C63FF), foregroundColor: Colors.white,
       actions: [
         if (!_hasActiveRide) IconButton(icon: const Icon(Icons.support_agent), onPressed: _showSupport),
         IconButton(icon: const Icon(Icons.sos, color: Colors.redAccent), onPressed: _sendSOS),
@@ -198,7 +198,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
           child: _currentLoc != null
               ? FlutterMap(options: MapOptions(center: _currentLoc!, zoom: 15), children: [
-                  TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.ziprick.driver'),
+                  TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.vybe.driver'),
                   MarkerLayer(markers: [Marker(point: _currentLoc!, width: 80, height: 80, child: Icon(Icons.electric_rickshaw_rounded, size: 48, color: _isOnline ? const Color(0xFF4CAF50) : const Color(0xFF9CA3AF)))]),
                 ])
               : const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [CircularProgressIndicator(), SizedBox(height: 12), Text('Fetching location...')])),

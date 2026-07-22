@@ -16,9 +16,9 @@ class _TermsScreenState extends State<TermsScreen> {
       const SizedBox(height: 20),
       Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _t('1. Services'), _d('I agree to provide e-rickshaw ride services through the Zip-Rick platform.'),
-          _t('2. Background Check'), _d('I authorize Zip-Rick to verify my documents.'),
-          _t('3. Commission'), _d('I agree to pay 10% commission on each ride fare to Zip-Rick.'),
+          _t('1. Services'), _d('I agree to provide e-rickshaw ride services through the Vybe platform.'),
+          _t('2. Background Check'), _d('I authorize Vybe to verify my documents.'),
+          _t('3. Commission'), _d('I agree to pay 10% commission on each ride fare to Vybe.'),
           _t('4. Conduct'), _d('I will maintain professional conduct with passengers.'),
           _t('5. Cancellation'), _d('Excessive cancellations may result in account suspension.'),
           _t('6. Fees'), _d('The registration fee of ₹499 is non-refundable.'),

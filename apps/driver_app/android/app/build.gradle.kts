@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.ziprick.zip_rick_driver"
+    namespace = "com.vybe.driver"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -15,7 +15,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.ziprick.zip_rick_driver"
+        applicationId = "com.vybe.driver"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutter.versionCode

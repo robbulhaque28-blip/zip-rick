@@ -11,13 +11,13 @@ import "screens/support_page.dart";
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(statusBarColor: Colors.transparent));
-  runApp(const ZipRickApp());
+  runApp(const VybeApp());
 }
 
-class ZipRickApp extends StatelessWidget {
-  const ZipRickApp({super.key});
+class VybeApp extends StatelessWidget {
+  const VybeApp({super.key});
   @override Widget build(BuildContext context) => MaterialApp(
-    title: "Zip-Rick", debugShowCheckedModeBanner: false,
+    title: "Vybe", debugShowCheckedModeBanner: false,
     theme: ThemeData(
       useMaterial3: true,
       colorSchemeSeed: const Color(0xFF6C63FF),

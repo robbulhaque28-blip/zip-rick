@@ -1,9 +1,9 @@
-# Zip-Rick Driver App User Manual
+# Vybe Driver App User Manual
 
 ## Getting Started
 
 ### Download & Install
-- **Android**: Download from Google Play Store - search "Zip-Rick Driver"
+- **Android**: Download from Google Play Store - search "Vybe Driver"
 - A smartphone with GPS, camera, and internet is required
 
 ---
@@ -11,7 +11,7 @@
 ## Registration Process
 
 ### Step 1: Create Account
-1. Open Zip-Rick Driver app
+1. Open Vybe Driver app
 2. Enter your mobile number (+91 for India)
 3. Tap **"Send OTP"**
 4. Enter the 6-digit OTP
@@ -173,7 +173,7 @@ When a ride request arrives:
 
 ### Your Earnings
 - **Total Fare** = Customer pays this
-- **Commission** = 10% (Zip-Rick platform fee)
+- **Commission** = 10% (Vybe platform fee)
 - **Your Earnings** = Total Fare - Commission
 
 *Example: Ride fare ₹100*

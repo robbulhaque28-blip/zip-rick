@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.zip_rick_customer"
+    namespace = "com.vybe.customer"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -16,7 +16,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.zip_rick_customer"
+        applicationId = "com.vybe.customer"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutter.versionCode

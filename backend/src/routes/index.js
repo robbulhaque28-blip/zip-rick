@@ -20,7 +20,7 @@ router.get('/health', (req, res) => {
   res.json({
     success: true,
     data: {
-      service: 'zip-rick-api',
+      service: 'vybe-api',
       version: '1.0.0',
       environment: config.env,
       timestamp: new Date().toISOString(),

@@ -91,7 +91,7 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
   }
 
   void _shareRide() {
-    Clipboard.setData(ClipboardData(text: "I'm riding with Zip-Rick!\n📍 ${widget.rideData["pickup_address"] ?? "N/A"}\n🏁 ${widget.rideData["drop_address"] ?? "N/A"}\n💰 ₹${widget.rideData["total_fare"] ?? 0}"));
+    Clipboard.setData(ClipboardData(text: "I'm riding with Vybe!\n📍 ${widget.rideData["pickup_address"] ?? "N/A"}\n🏁 ${widget.rideData["drop_address"] ?? "N/A"}\n💰 ₹${widget.rideData["total_fare"] ?? 0}"));
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Trip details copied!")));
   }
 
@@ -109,7 +109,7 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
         Expanded(
           child: FlutterMap(mapController: _mapCtrl, options: MapOptions(center: _driverLatLng ?? _pickupLatLng, zoom: 15),
             children: [
-              TileLayer(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", userAgentPackageName: "com.ziprick.customer"),
+              TileLayer(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", userAgentPackageName: "com.vybe.customer"),
               MarkerLayer(markers: [
                 Marker(point: _pickupLatLng, width: 40, height: 40, child: const Icon(Icons.location_on, color: Colors.green, size: 35)),
                 if (_driverLatLng != null) Marker(point: _driverLatLng!, width: 60, height: 60,

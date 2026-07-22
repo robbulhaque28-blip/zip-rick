@@ -1,4 +1,4 @@
-package com.ziprick.zip_rick_driver
+package com.example.vybe_customer
 
 import io.flutter.embedding.android.FlutterActivity
 

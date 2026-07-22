@@ -1,4 +1,4 @@
-﻿const { User, Customer } = require('./src/models');
+const { User, Customer } = require('./src/models');
 
 async function checkCustomers() {
   try {

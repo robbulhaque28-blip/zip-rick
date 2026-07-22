@@ -1,6 +1,6 @@
-# 🛺 Zip-Rick - E-Rickshaw Ride-Hailing Platform
+# 🛺 Vybe - E-Rickshaw Ride-Hailing Platform
 
-**Zip-Rick** is a production-grade, full-stack ride-hailing platform exclusively for **E-Rickshaws**, built for the Indian market. Designed as a scalable startup system ready to serve millions of users across India.
+**Vybe** is a production-grade, full-stack ride-hailing platform exclusively for **E-Rickshaws**, built for the Indian market. Designed as a scalable startup system ready to serve millions of users across India.
 
 ---
 
@@ -8,7 +8,7 @@
 
 | Feature | Details |
 |---------|---------|
-| **App Name** | Zip-Rick |
+| **App Name** | Vybe |
 | **Country** | India |
 | **Initial Launch** | Assam (all cities) |
 | **Future Expansion** | Entire India |
@@ -136,7 +136,7 @@ Monitoring:       CloudWatch + Sentry
 ### Backend Setup
 
 ```bash
-cd zip-rick/backend
+cd vybe/backend
 
 # Install dependencies
 npm install
@@ -158,7 +158,7 @@ npm run dev
 ### Docker Setup
 
 ```bash
-cd zip-rick/docker
+cd vybe/docker
 docker-compose up -d
 # API at http://localhost:4000
 # Swagger docs at http://localhost:4000/api/docs
@@ -241,7 +241,7 @@ MIT License - See [LICENSE](LICENSE) file
 
 ## 🤝 Support
 
-For support, email support@zip-rick.com or raise an issue on GitHub.
+For support, email support@vybe.com or raise an issue on GitHub.
 
 ---
 

@@ -16,12 +16,12 @@ class AppColors {
   static const textDark = Color(0xFF1F2937);
 }
 
-void main() { WidgetsFlutterBinding.ensureInitialized(); runApp(const ZipRickDriverApp()); }
+void main() { WidgetsFlutterBinding.ensureInitialized(); runApp(const VybeDriverApp()); }
 
-class ZipRickDriverApp extends StatelessWidget {
-  const ZipRickDriverApp({super.key});
+class VybeDriverApp extends StatelessWidget {
+  const VybeDriverApp({super.key});
   @override Widget build(BuildContext context) => MaterialApp(
-    title: 'Zip-Rick Driver', debugShowCheckedModeBanner: false,
+    title: 'Vybe Driver', debugShowCheckedModeBanner: false,
     theme: ThemeData(useMaterial3: true, colorSchemeSeed: AppColors.primary, scaffoldBackgroundColor: AppColors.bg,
       appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0, backgroundColor: Colors.white, foregroundColor: AppColors.textDark)),
     initialRoute: '/', routes: {

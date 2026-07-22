@@ -1,7 +1,7 @@
-# Zip-Rick Project Folder Structure
+# Vybe Project Folder Structure
 
 ```
-zip-rick/
+vybe/
 ├── README.md
 ├── LICENSE
 ├── .gitignore

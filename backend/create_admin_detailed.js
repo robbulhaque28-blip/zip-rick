@@ -6,7 +6,7 @@ async function createAdminDetailed() {
     console.log('Creating user...');
     const user = await User.create({
       phone: '+12345678901',
-      email: 'admin@zip-rick.com',
+      email: 'admin@vybe.com',
       full_name: 'Admin User',
       role: 'admin'
     });
@@ -17,14 +17,14 @@ async function createAdminDetailed() {
     const hash = await bcrypt.hash('admin123', 12);
     const admin = await AdminUser.create({
       user_id: user.id,
-      email: 'admin@zip-rick.com',
+      email: 'admin@vybe.com',
       password_hash: hash,
       role: 'super_admin',
       is_active: true
     });
     
     console.log('✅ Admin created successfully!');
-    console.log('Email: admin@zip-rick.com');
+    console.log('Email: admin@vybe.com');
     console.log('Password: admin123');
     
   } catch (error) {
