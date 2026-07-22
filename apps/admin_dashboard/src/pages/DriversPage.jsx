@@ -117,32 +117,45 @@ export default function DriversPage() {
       </TableContainer>
 
       {/* Documents Dialog */}
-      <Dialog open={!!docDialog} onClose={() => setDocDialog(null)} maxWidth="sm" fullWidth>
+      <Dialog open={!!docDialog} onClose={() => setDocDialog(null)} maxWidth="md" fullWidth>
         {docDialog && (
           <>
             <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span><strong>{docDialog.user?.full_name || 'Driver'}</strong> - Documents</span>
+              <span><strong>{docDialog.user?.full_name || 'Driver'}</strong> - Document Verification</span>
               <IconButton size="small" onClick={() => setDocDialog(null)}><Close /></IconButton>
             </DialogTitle>
             <DialogContent dividers>
               {/* Personal Info Summary */}
-              <Box sx={{ mb: 2, p: 2, bgcolor: '#F5F6FA', borderRadius: 2 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>Phone: {docDialog.user?.phone || 'N/A'}</Typography>
+              <Box sx={{ mb: 2, p: 2, bgcolor: '#F5F6FA', borderRadius: 2, display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>📞 {docDialog.user?.phone || 'N/A'}</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>Status: <Chip label={docDialog.registration_status} color={statusColor(docDialog.registration_status)} size="small" /></Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>Fee Paid: {docDialog.registration_fee_paid ? '✅ Yes' : '❌ No'}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>Fee: {docDialog.registration_fee_paid ? '✅ Paid' : '❌ Pending'}</Typography>
               </Box>
 
-              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Uploaded Documents</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>📸 Uploaded Documents</Typography>
               {(docDialog.documents || []).length === 0 && <Typography color="text.secondary">No documents uploaded</Typography>}
-              {(docDialog.documents || []).map((doc, i) => (
-                <Box key={i} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, mb: 1, bgcolor: '#FAFAFA', borderRadius: 1, border: '1px solid #eee' }}>
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{docLabels[doc.document_type] || doc.document_type}</Typography>
-                    <Typography variant="caption" color="text.secondary">{doc.document_url ? doc.document_url.split('/').pop() : 'Photo taken'}</Typography>
-                  </Box>
-                  <Chip label={doc.status || 'pending'} size="small" color={doc.status === 'approved' ? 'success' : doc.status === 'rejected' ? 'error' : 'warning'} />
-                </Box>
-              ))}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {(docDialog.documents || []).map((doc, i) => {
+                  const isImage = doc.document_url && (doc.document_url.startsWith('data:image') || doc.document_url.match(/\.(jpg|jpeg|png|gif)$/i));
+                  return (
+                    <Box key={i} sx={{ p: 2, bgcolor: '#FAFAFA', borderRadius: 2, border: '1px solid #eee' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{docLabels[doc.document_type] || doc.document_type}</Typography>
+                        <Chip label={doc.status || 'pending'} size="small" color={doc.status === 'approved' ? 'success' : doc.status === 'rejected' ? 'error' : 'warning'} />
+                      </Box>
+                      {isImage ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', bgcolor: '#fff', borderRadius: 1, p: 1, border: '1px solid #ddd' }}>
+                          <img src={doc.document_url} alt={doc.document_type} style={{ maxWidth: '100%', maxHeight: 300, objectFit: 'contain', borderRadius: 4 }} />
+                        </Box>
+                      ) : (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4, bgcolor: '#fff', borderRadius: 1, border: '1px solid #ddd', color: '#999' }}>
+                          <Typography>No image available</Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Box>
 
               {/* Vehicle Info */}
               {docDialog.vehicle && (

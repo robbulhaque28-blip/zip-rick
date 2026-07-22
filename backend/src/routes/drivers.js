@@ -25,8 +25,22 @@ router.put("/profile", asyncHandler(async (req, res) => {
 
 router.post("/documents", asyncHandler(async (req, res) => {
   const driver = await Driver.findOne({ where: { user_id: req.userId } });
-  const doc = await DriverDocument.create({ driver_id: driver.id, document_type: req.body.document_type, document_url: req.body.document_url });
-  driver.is_documents_uploaded = true; await driver.save();
+  if (!driver) throw new ApiError(404, "Driver not found");
+  
+  let documentUrl = req.body.document_url || '';
+  
+  // If base64 image data is provided, store it directly
+  if (req.body.document_data && req.body.document_data.startsWith('data:image')) {
+    documentUrl = req.body.document_data;
+  }
+  
+  const doc = await DriverDocument.create({ 
+    driver_id: driver.id, 
+    document_type: req.body.document_type, 
+    document_url: documentUrl 
+  });
+  driver.is_documents_uploaded = true; 
+  await driver.save();
   return success(res, { document: doc }, "Document uploaded");
 }));
 

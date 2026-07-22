@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
@@ -41,6 +43,13 @@ class _RegisterDocsScreenState extends State<RegisterDocsScreen> {
     if (x != null) setState(() => _docs[key] = x);
   }
 
+  Future<String> _imageToBase64(XFile file) async {
+    final bytes = await File(file.path).readAsBytes();
+    final ext = file.path.split('.').last.toLowerCase();
+    final mime = ext == 'png' ? 'image/png' : ext == 'gif' ? 'image/gif' : 'image/jpeg';
+    return 'data:$mime;base64,' + base64Encode(bytes);
+  }
+
   Future<void> _submit() async {
     if (_docs['aadhaar_front'] == null || _docs['selfie'] == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Upload at least Aadhaar Front + Selfie')));
@@ -54,7 +63,14 @@ class _RegisterDocsScreenState extends State<RegisterDocsScreen> {
     try {
       for (final e in _docs.entries) {
         if (e.value != null) {
-          try { await ApiService.post('/drivers/documents', {'document_type': e.key, 'document_url': e.value!.path}); } catch (_) {}
+          try {
+            final base64 = await _imageToBase64(e.value!);
+            await ApiService.post('/drivers/documents', {
+              'document_type': e.key,
+              'document_url': e.key,
+              'document_data': base64,
+            });
+          } catch (_) {}
         }
       }
       try { await ApiService.updateProfile({'bank_name': _bankNameCtrl.text, 'account_holder': _acctHolderCtrl.text, 'account_number': _acctNumCtrl.text, 'ifsc_code': _ifscCtrl.text}); } catch (_) {}

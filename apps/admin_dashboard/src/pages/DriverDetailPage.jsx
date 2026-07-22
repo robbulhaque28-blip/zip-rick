@@ -5,6 +5,8 @@ import { ArrowBack } from '@mui/icons-material';
 
 const API = 'https://zip-rick-4.onrender.com/api/v1';
 
+const docLabels = { aadhaar_front: 'Aadhaar (Front)', aadhaar_back: 'Aadhaar (Back)', selfie: 'Live Photo', rc: 'Vehicle RC', insurance: 'Vehicle Insurance' };
+
 export default function DriverDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -72,15 +74,29 @@ export default function DriverDetailPage() {
           <Card><CardContent>
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Documents</Typography>
             {docs.length === 0 && <Typography color="text.secondary">No documents uploaded</Typography>}
-            <Grid container spacing={1}>
-              {docs.map((doc, i) => (
-                <Grid item xs={12} sm={6} md={4} key={i}>
-                  <Paper variant="outlined" sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2">{doc.document_type}</Typography>
-                    <Chip label={doc.status || 'pending'} size="small" color={doc.status === 'approved' ? 'success' : 'warning'} />
-                  </Paper>
-                </Grid>
-              ))}
+            <Grid container spacing={2}>
+              {docs.map((doc, i) => {
+                const isImage = doc.document_url && (doc.document_url.startsWith('data:image') || doc.document_url.match(/\.(jpg|jpeg|png|gif)$/i));
+                return (
+                  <Grid item xs={12} sm={6} md={4} key={i}>
+                    <Paper variant="outlined" sx={{ p: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{docLabels[doc.document_type] || doc.document_type}</Typography>
+                        <Chip label={doc.status || 'pending'} size="small" color={doc.status === 'approved' ? 'success' : 'warning'} />
+                      </Box>
+                      {isImage ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', bgcolor: '#FAFAFA', borderRadius: 1, p: 1, minHeight: 120 }}>
+                          <img src={doc.document_url} alt={doc.document_type} style={{ maxWidth: '100%', maxHeight: 200, objectFit: 'contain', borderRadius: 4 }} />
+                        </Box>
+                      ) : (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 3, bgcolor: '#FAFAFA', borderRadius: 1, color: '#999' }}>
+                          <Typography variant="caption">No image</Typography>
+                        </Box>
+                      )}
+                    </Paper>
+                  </Grid>
+                );
+              })}
             </Grid>
           </CardContent></Card>
         </Grid>
