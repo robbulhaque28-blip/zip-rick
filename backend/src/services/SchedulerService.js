@@ -12,45 +12,39 @@ function startScheduler() {
     try {
       const now = new Date();
       
-      // Find all scheduled rides whose time has come (within last 5 seconds tolerance)
       const scheduledRides = await Ride.findAll({
         where: {
           status: 'scheduled',
-          scheduled_at: {
-            [Op.lte]: now,
-          },
+          scheduled_at: { [Op.lte]: now },
         },
       });
-
-      if (scheduledRides.length > 0) {
-        logger.info(`Scheduler: Processing ${scheduledRides.length} scheduled ride(s)`);
-      }
 
       for (const ride of scheduledRides) {
         try {
           ride.status = 'searching';
           await ride.save();
           
-          await RideStatusLog.create({
-            ride_id: ride.id,
-            previous_status: 'scheduled',
-            new_status: 'searching',
-            changed_by: 'system',
-            metadata: { scheduled_at: ride.scheduled_at },
-          });
+          try {
+            await RideStatusLog.create({
+              ride_id: ride.id,
+              previous_status: 'scheduled',
+              new_status: 'searching',
+              changed_by: 'system',
+            });
+          } catch (logErr) {
+            // Status log is optional
+          }
           
           logger.info(`Scheduler: Ride ${ride.ride_number} moved from scheduled to searching`);
-          
-          // Start finding drivers
           RideMatchingService.startSearch(ride, null, null);
         } catch (err) {
-          logger.error(`Scheduler: Error processing ride ${ride.ride_number}: ${err.message}`);
+          logger.error(`Scheduler: Error processing ride ${ride.ride_number}: ${err.message || err}`);
         }
       }
     } catch (err) {
-      logger.error('Scheduler error:', err.message);
+      logger.error(`Scheduler error: ${err.message || err}`);
     }
-  }, 30000); // Check every 30 seconds
+  }, 30000);
 }
 
 function stopScheduler() {

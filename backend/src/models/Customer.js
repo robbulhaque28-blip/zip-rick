@@ -60,10 +60,6 @@ Customer.init(
       type: DataTypes.INTEGER,
       defaultValue: 0,
     },
-    referral_discount_earned: {
-      type: DataTypes.DECIMAL(10, 2),
-      defaultValue: 0,
-    },
   },
   {
     sequelize,
