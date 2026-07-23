@@ -129,7 +129,7 @@ class _ChatBottomSheetState extends State<ChatBottomSheet> {
                           'No messages yet',
                           style: TextStyle(color: Colors.grey.shade500, fontSize: 16),
                         ),
-                        const Text(
+                        Text(
                           'Send a message to your driver',
                           style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
                         ),
