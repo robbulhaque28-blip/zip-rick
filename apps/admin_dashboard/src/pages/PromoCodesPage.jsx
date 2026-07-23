@@ -7,7 +7,7 @@ const API = 'https://zip-rick-4.onrender.com/api/v1';
 export default function PromoCodesPage() {
   const [codes, setCodes] = useState([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ code: '', discount_type: 'percentage', discount_value: 10, max_uses: 100, min_fare: 0, expires_at: '' });
+  const [form, setForm] = useState({ code: '', discount_type: 'percentage', discount_value: 10, expires_at: '' });
   const [msg, setMsg] = useState('');
 
   const load = async () => {
@@ -56,15 +56,13 @@ export default function PromoCodesPage() {
             <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
           </TableRow></TableHead>
           <TableBody>
-            {codes.length === 0 && <TableRow><TableCell colSpan={7} sx={{ textAlign: 'center', py: 4, color: '#999' }}>No promo codes</TableCell></TableRow>}
+            {codes.length === 0 && <TableRow><TableCell colSpan={5} sx={{ textAlign: 'center', py: 4, color: '#999' }}>No promo codes</TableCell></TableRow>}
             {codes.map(c => (
               <TableRow key={c.id}>
                 <TableCell><Chip label={c.code} color="primary" size="small" /></TableCell>
                 <TableCell>{c.discount_type === 'percentage' ? (c.discount || 0) + '%' : '₹' + (c.discount || 0)}</TableCell>
-                <TableCell>{c.usage_count || 0}</TableCell>
-                <TableCell>{c.max_uses || '∞'}</TableCell>
-                <TableCell>₹{c.min_fare || 0}</TableCell>
-                <TableCell>{c.expires_at || c.expiry_date ? new Date(c.expires_at || c.expiry_date).toLocaleDateString() : 'Never'}</TableCell>
+                <TableCell><Chip label={c.status || 'active'} size="small" color={c.status === 'active' ? 'success' : 'default'} /></TableCell>
+                <TableCell>{c.expiry_date ? new Date(c.expiry_date).toLocaleDateString() : 'Never'}</TableCell>
                 <TableCell><IconButton size="small" color="error" onClick={() => remove(c.id)}><Delete /></IconButton></TableCell>
               </TableRow>
             ))}
@@ -78,8 +76,6 @@ export default function PromoCodesPage() {
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
             <TextField label="Code" value={form.code} onChange={e => setForm({...form, code: e.target.value.toUpperCase()})} />
             <TextField label="Discount Value" type="number" value={form.discount_value} onChange={e => setForm({...form, discount_value: parseFloat(e.target.value) || 0})} />
-            <TextField label="Max Uses" type="number" value={form.max_uses} onChange={e => setForm({...form, max_uses: parseInt(e.target.value) || 0})} />
-            <TextField label="Min Fare" type="number" value={form.min_fare} onChange={e => setForm({...form, min_fare: parseFloat(e.target.value) || 0})} />
             <TextField label="Expires At" type="date" value={form.expires_at} onChange={e => setForm({...form, expires_at: e.target.value})} InputLabelProps={{ shrink: true }} />
           </Box>
         </DialogContent>

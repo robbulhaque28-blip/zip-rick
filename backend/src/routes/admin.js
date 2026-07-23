@@ -240,10 +240,8 @@ router.post('/promo-codes', asyncHandler(async (req, res) => {
     code: req.body.code,
     discount: req.body.discount_value || req.body.discount || 10,
     discount_type: req.body.discount_type || 'percentage',
-    max_uses: req.body.max_uses || 100,
-    min_fare: req.body.min_fare || 0,
-    expires_at: req.body.expires_at || null,
-    created_by: a?.id,
+    status: 'active',
+    expiry_date: req.body.expires_at || req.body.expiry_date || null,
   };
   const p = await PromoCode.create(data);
   return success(res, { promo_code: p }, 'Created');
