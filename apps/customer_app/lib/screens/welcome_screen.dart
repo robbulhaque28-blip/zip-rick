@@ -7,7 +7,7 @@ class WelcomeScreen extends StatelessWidget {
     body: SafeArea(child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       const Spacer(flex: 2),
       Container(width: 120, height: 120, decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
-        child: const Icon(Icons.electric_rickshaw_rounded, size: 60, color: Colors.white)),
+        child: Text("V", style: TextStyle(color: Colors.white, fontSize: 60, fontWeight: FontWeight.bold))),
       const SizedBox(height: 24),
       const Text("Vybe", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
       const SizedBox(height: 8),

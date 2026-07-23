@@ -34,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override Widget build(BuildContext context) => Scaffold(body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
     const SizedBox(height: 80),
-    Container(width: 80, height: 80, decoration: BoxDecoration(color: const Color(0xFF6C63FF).withOpacity(0.1), shape: BoxShape.circle), child: const Icon(Icons.electric_rickshaw_rounded, size: 40, color: Color(0xFF6C63FF))),
+    Container(width: 80, height: 80, decoration: BoxDecoration(color: const Color(0xFF6C63FF).withOpacity(0.1), shape: BoxShape.circle), child: Text("V", style: TextStyle(color: Color(0xFF6C63FF), fontSize: 36, fontWeight: FontWeight.bold))),
     const SizedBox(height: 24), const Text("Welcome Back", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF1F2937))),
     const SizedBox(height: 8), const Text("Login to your account", style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 16)),
     const SizedBox(height: 40),

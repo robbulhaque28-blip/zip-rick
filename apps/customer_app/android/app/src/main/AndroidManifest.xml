@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <application
-        android:label="vybe_customer"
+        android:label="Vybe"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

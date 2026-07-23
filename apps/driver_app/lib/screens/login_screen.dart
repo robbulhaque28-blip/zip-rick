@@ -49,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const SizedBox(height: 30),
       Container(width: 80, height: 80, decoration: BoxDecoration(color: const Color(0xFF6C63FF).withOpacity(0.1), shape: BoxShape.circle),
-        child: const Icon(Icons.electric_rickshaw_rounded, size: 40, color: Color(0xFF6C63FF))),
+        child: const Text("V", style: TextStyle(color: Color(0xFF6C63FF), fontSize: 36, fontWeight: FontWeight.bold))),
       const SizedBox(height: 24),
       if (!_showOtp) Container(
         decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),

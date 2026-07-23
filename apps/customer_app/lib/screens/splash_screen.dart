@@ -22,7 +22,8 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) => const Scaffold(
     backgroundColor: Color(0xFF6C63FF),
     body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Icon(Icons.electric_rickshaw_rounded, size: 120, color: Colors.white),
+      Container(width: 100, height: 100, decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+        child: const Icon(Icons.electric_rickshaw_rounded, size: 50, color: Colors.white)),
       SizedBox(height: 24),
       Text("Vybe", style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)),
       SizedBox(height: 8),
