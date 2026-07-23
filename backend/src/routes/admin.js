@@ -313,6 +313,172 @@ router.get('/audit-logs', asyncHandler(async (req, res) => {
   return paginated(res, rows, count, p, l);
 }));
 
+// Admin Reports - JSON data (for PDF generation)
+router.get('/reports-data/:type', asyncHandler(async (req, res) => {
+  const { type } = req.params;
+  const days = parseInt(req.query.days) || 30;
+  const startDate = req.query.start ? new Date(req.query.start) : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const endDate = req.query.end ? new Date(req.query.end) : new Date();
+  
+  let data = [];
+  if (type === 'customers') {
+    const customers = await Customer.findAll({
+      include: [{ association: 'user', attributes: ['full_name', 'phone', 'email', 'created_at'] }],
+      order: [['created_at', 'DESC']],
+    });
+    data = customers.map(c => ({
+      name: c.user?.full_name || '',
+      phone: c.user?.phone || '',
+      email: c.user?.email || '',
+      rides: c.total_rides || 0,
+      spent: c.total_spent || 0,
+      rating: c.rating || 0,
+      joined: c.created_at ? new Date(c.created_at).toLocaleDateString() : '',
+    }));
+  } else if (type === 'drivers') {
+    const drivers = await Driver.findAll({
+      include: [{ association: 'user', attributes: ['full_name', 'phone', 'email'] }, 'vehicle'],
+      order: [['created_at', 'DESC']],
+    });
+    data = drivers.map(d => ({
+      name: d.user?.full_name || '',
+      phone: d.user?.phone || '',
+      email: d.user?.email || '',
+      status: d.registration_status,
+      rides: d.total_rides || 0,
+      earnings: d.total_earnings || 0,
+      vehicle: d.vehicle?.vehicle_number || 'N/A',
+      joined: d.created_at ? new Date(d.created_at).toLocaleDateString() : '',
+    }));
+  } else if (type === 'rides') {
+    const where = { created_at: { [Op.gte]: startDate, [Op.lte]: endDate } };
+    const rides = await Ride.findAll({
+      where,
+      include: [{ association: 'customer', include: [{ association: 'user', attributes: ['full_name'] }] },
+                { association: 'driver', include: [{ association: 'user', attributes: ['full_name'] }] }],
+      order: [['created_at', 'DESC']], limit: 1000,
+    });
+    data = rides.map(r => ({
+      ride_number: r.ride_number,
+      customer: r.customer?.user?.full_name || 'N/A',
+      driver: r.driver?.user?.full_name || 'N/A',
+      pickup: r.pickup_address || '',
+      drop: r.drop_address || '',
+      status: r.status,
+      fare: r.total_fare || 0,
+      date: r.created_at ? new Date(r.created_at).toLocaleDateString() : '',
+    }));
+  } else if (type === 'revenue') {
+    const where = { created_at: { [Op.gte]: startDate, [Op.lte]: endDate } };
+    const payments = await Payment.findAll({
+      where,
+      include: [{ association: 'ride', attributes: ['ride_number'] }],
+      order: [['created_at', 'DESC']],
+    });
+    const total = payments.reduce((s, p) => s + parseFloat(p.amount || 0), 0);
+    data = {
+      total_revenue: total,
+      count: payments.length,
+      payments: payments.map(p => ({
+        ride_number: p.ride?.ride_number || 'N/A',
+        amount: p.amount || 0,
+        method: p.payment_method || 'N/A',
+        status: p.payment_status || 'N/A',
+        date: p.created_at ? new Date(p.created_at).toLocaleDateString() : '',
+      })),
+    };
+  }
+  
+  return success(res, { data, type, period: { from: startDate, to: endDate } });
+}));
+
+// Admin Reports - HTML/PDF printable view
+router.get('/reports-pdf/:type', asyncHandler(async (req, res) => {
+  const { type } = req.params;
+  const days = parseInt(req.query.days) || 30;
+  const startDate = req.query.start ? new Date(req.query.start) : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const endDate = req.query.end ? new Date(req.query.end) : new Date();
+  
+  let rows = '';
+  let title = type.charAt(0).toUpperCase() + type.slice(1);
+  
+  if (type === 'customers') {
+    const customers = await Customer.findAll({
+      include: [{ association: 'user', attributes: ['full_name', 'phone', 'email', 'created_at'] }],
+      order: [['created_at', 'DESC']],
+    });
+    rows = '<table><tr><th>Name</th><th>Phone</th><th>Email</th><th>Rides</th><th>Spent</th><th>Rating</th><th>Joined</th></tr>';
+    customers.forEach(c => {
+      rows += `<tr><td>${c.user?.full_name || ''}</td><td>${c.user?.phone || ''}</td><td>${c.user?.email || ''}</td><td>${c.total_rides || 0}</td><td>₹${c.total_spent || 0}</td><td>${c.rating || 0}</td><td>${new Date(c.created_at).toLocaleDateString()}</td></tr>`;
+    });
+    rows += '</table>';
+  } else if (type === 'drivers') {
+    const drivers = await Driver.findAll({
+      include: [{ association: 'user', attributes: ['full_name', 'phone', 'email'] }, 'vehicle'],
+      order: [['created_at', 'DESC']],
+    });
+    rows = '<table><tr><th>Name</th><th>Phone</th><th>Email</th><th>Status</th><th>Rides</th><th>Earnings</th><th>Vehicle</th><th>Joined</th></tr>';
+    drivers.forEach(d => {
+      rows += `<tr><td>${d.user?.full_name || ''}</td><td>${d.user?.phone || ''}</td><td>${d.user?.email || ''}</td><td>${d.registration_status}</td><td>${d.total_rides || 0}</td><td>₹${d.total_earnings || 0}</td><td>${d.vehicle?.vehicle_number || 'N/A'}</td><td>${new Date(d.created_at).toLocaleDateString()}</td></tr>`;
+    });
+    rows += '</table>';
+  } else if (type === 'rides') {
+    const where = { created_at: { [Op.gte]: startDate, [Op.lte]: endDate } };
+    const rides = await Ride.findAll({
+      where,
+      include: [{ association: 'customer', include: [{ association: 'user', attributes: ['full_name'] }] },
+                { association: 'driver', include: [{ association: 'user', attributes: ['full_name'] }] }],
+      order: [['created_at', 'DESC']], limit: 1000,
+    });
+    rows = '<table><tr><th>Ride #</th><th>Customer</th><th>Driver</th><th>Pickup</th><th>Drop</th><th>Status</th><th>Fare</th><th>Date</th></tr>';
+    rides.forEach(r => {
+      rows += `<tr><td>${r.ride_number}</td><td>${r.customer?.user?.full_name || 'N/A'}</td><td>${r.driver?.user?.full_name || 'N/A'}</td><td>${(r.pickup_address || '').replace(/"/g,'""')}</td><td>${(r.drop_address || '').replace(/"/g,'""')}</td><td>${r.status}</td><td>₹${r.total_fare || 0}</td><td>${new Date(r.created_at).toLocaleDateString()}</td></tr>`;
+    });
+    rows += '</table>';
+  } else if (type === 'revenue') {
+    const where = { created_at: { [Op.gte]: startDate, [Op.lte]: endDate } };
+    const payments = await Payment.findAll({
+      where,
+      include: [{ association: 'ride', attributes: ['ride_number'] }],
+      order: [['created_at', 'DESC']],
+    });
+    const total = payments.reduce((s, p) => s + parseFloat(p.amount || 0), 0);
+    rows = `<h2>Total Revenue: ₹${total.toFixed(2)}</h2><h3>Transactions: ${payments.length}</h3>`;
+    rows += '<table><tr><th>Ride #</th><th>Amount</th><th>Method</th><th>Status</th><th>Date</th></tr>';
+    payments.forEach(p => {
+      rows += `<tr><td>${p.ride?.ride_number || 'N/A'}</td><td>₹${p.amount || 0}</td><td>${p.payment_method || 'N/A'}</td><td>${p.payment_status || 'N/A'}</td><td>${new Date(p.created_at).toLocaleDateString()}</td></tr>`;
+    });
+    rows += '</table>';
+  }
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>${title} Report - Vybe Admin</title>
+<style>
+  body { font-family: Arial; padding: 20px; color: #333; }
+  h1 { color: #6C63FF; }
+  .meta { color: #666; margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #6C63FF; color: white; padding: 8px; text-align: left; }
+  td { padding: 6px 8px; border-bottom: 1px solid #ddd; }
+  tr:nth-child(even) { background: #f9f9f9; }
+  @media print { body { padding: 0; } }
+</style></head><body>
+<h1>Vybe - ${title} Report</h1>
+<p class="meta">Period: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()} | Generated: ${new Date().toLocaleString()}</p>
+${rows}
+<p style="margin-top:20px;color:#999;font-size:11px;">Vybe Admin Platform - Confidential</p>
+</body></html>`;
+
+  const format = req.query.format || 'html';
+  if (format === 'html') {
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } else {
+    // Return JSON with HTML content for frontend to use window.print()
+    return success(res, { html, title });
+  }
+}));
+
 // Admin Reports - Export CSV
 router.get('/reports/customers', asyncHandler(async (req, res) => {
   const { Op } = require('sequelize');

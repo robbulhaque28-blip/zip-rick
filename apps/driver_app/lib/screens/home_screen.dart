@@ -326,6 +326,24 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
           const SizedBox(width: 12),
           Expanded(child: _ec('Week', '₹${d['week_earnings'] ?? '0'}', Icons.date_range, const Color(0xFFFFA726))),
         ]),
+        const SizedBox(height: 12),
+        // Monthly earnings card
+        Container(width: double.infinity, padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
+          child: Row(children: [
+            Container(width: 48, height: 48, decoration: BoxDecoration(color: const Color(0xFF6C63FF).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+              child: const Icon(Icons.calendar_month, color: Color(0xFF6C63FF))),
+            const SizedBox(width: 16),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Monthly Estimate', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13)),
+              const SizedBox(height: 4),
+              Text('₹${((double.tryParse('${d['week_earnings'] ?? '0'}') ?? 0) * 4.33).toStringAsFixed(0)}', 
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF6C63FF))),
+            ])),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), 
+              decoration: BoxDecoration(color: const Color(0xFF4CAF50).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+              child: const Text('Estimated', style: TextStyle(color: Color(0xFF4CAF50), fontSize: 11, fontWeight: FontWeight.bold))),
+          ])),
       ]));
     },
   );
