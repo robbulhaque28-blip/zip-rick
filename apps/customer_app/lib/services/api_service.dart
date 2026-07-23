@@ -80,8 +80,8 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
-  Future<Map<String, dynamic>> cancelRide(String rideId) async {
-    final res = await http.post(Uri.parse(baseUrl + '/rides/' + rideId + '/cancel'), headers: await _headers());
+  Future<Map<String, dynamic>> cancelRide(String rideId, {String reason = 'User cancelled'}) async {
+    final res = await http.post(Uri.parse(baseUrl + '/rides/' + rideId + '/cancel'), headers: await _headers(), body: jsonEncode({'reason': reason}));
     return jsonDecode(res.body);
   }
 

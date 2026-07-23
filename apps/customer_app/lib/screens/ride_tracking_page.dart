@@ -147,6 +147,87 @@ Timer? _animTimer;
     );
   }
 
+  final List<Map<String, String>> _cancelReasons = [
+    {'reason': 'Driver is taking too long', 'icon': '⏰'},
+    {'reason': 'Changed my mind', 'icon': '🤔'},
+    {'reason': 'Found another ride', 'icon': '🚗'},
+    {'reason': 'Trip not needed anymore', 'icon': '❌'},
+    {'reason': 'Driver behaviour is bad', 'icon': '😠'},
+    {'reason': 'Wrong pickup location', 'icon': '📍'},
+    {'reason': 'Booking by mistake', 'icon': '😅'},
+    {'reason': 'Other', 'icon': '💬'},
+  ];
+
+  void _showCancelDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(children: [
+          Icon(Icons.cancel, color: Colors.red, size: 28),
+          SizedBox(width: 8),
+          Text("Cancel Ride", style: TextStyle(fontWeight: FontWeight.bold)),
+        ]),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text("Why are you cancelling?",
+                style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
+            const SizedBox(height: 16),
+            ...List.generate(_cancelReasons.length, (i) {
+              final r = _cancelReasons[i];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _doCancel(r['reason'] ?? 'Other');
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      backgroundColor: Colors.grey.shade50,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Row(children: [
+                      Text(r['icon'] ?? '', style: const TextStyle(fontSize: 20)),
+                      const SizedBox(width: 12),
+                      Text(r['reason'] ?? '', style: const TextStyle(fontSize: 15, color: Color(0xFF1F2937))),
+                    ]),
+                  ),
+                ),
+              );
+            }),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Keep Riding")),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _doCancel(String reason) async {
+    try {
+      final r = await _api.cancelRide(widget.rideData["id"], reason: reason);
+      if (r["success"]) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Ride cancelled: $reason"), backgroundColor: Colors.red.shade400),
+          );
+          _goHome();
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to cancel")),
+        );
+      }
+    }
+  }
+
   void _shareRide() {
     Clipboard.setData(ClipboardData(text: "I'm riding with Vybe!\n📍 ${widget.rideData["pickup_address"] ?? "N/A"}\n🏁 ${widget.rideData["drop_address"] ?? "N/A"}\n💰 ₹${widget.rideData["total_fare"] ?? 0}"));
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Trip details copied!")));
@@ -219,9 +300,11 @@ if (_driverLatLng != null) Marker(point: _driverLatLng!, width: 60, height: 60,
       return SizedBox(width: double.infinity, height: 48, child: ElevatedButton(onPressed: () {},
         style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text("Ride in Progress...")));
     }
-    return SizedBox(width: double.infinity, height: 48, child: OutlinedButton(onPressed: () async {
-        try { final r = await _api.cancelRide(widget.rideData["id"]); if (r["success"]) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Cancelled"))); _goHome(); } } catch (_) {}
-      }, style: OutlinedButton.styleFrom(foregroundColor: Colors.red, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text("Cancel Ride")));
+    return SizedBox(width: double.infinity, height: 48, child: OutlinedButton.icon(
+      onPressed: _showCancelDialog,
+      icon: const Icon(Icons.cancel), 
+      label: const Text("Cancel Ride"),
+      style: OutlinedButton.styleFrom(foregroundColor: Colors.red, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))));
   }
 
   LatLng get _pickupLatLng => LatLng(
