@@ -45,18 +45,17 @@ export default function DashboardPage() {
 
   if (!stats) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 8 }}><CircularProgress /></Box>;
 
-  const chartData = (stats.revenue_chart || []).map(d => ({
+  const rawRevenueData = (stats.revenue_chart || []).map(d => ({
     day: d.date ? d.date.slice(5) : '',
     revenue: parseFloat(d.total_revenue || 0),
   }));
   // Always show last 7 days
-  const rawData = chartData;
-  chartData = [];
+  const chartData = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const dayLabel = d.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' });
-    const match = rawData.find(x => {
+    const match = rawRevenueData.find(x => {
       try {
         const xd = new Date(x.day + 'T00:00:00');
         return xd.toDateString() === d.toDateString();
