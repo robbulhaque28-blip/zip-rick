@@ -158,8 +158,10 @@ class _HomePageState extends State<HomePage> {
                 child: const Text("Search for Ride", style: TextStyle(fontSize: 16)))),
           ])),
         );
-      })),
-  }
+      }),
+    ),
+  );
+}
 
   Future<void> _getFare() async {
     if (_bookingInProgress) return;
