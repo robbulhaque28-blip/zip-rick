@@ -69,13 +69,21 @@ Timer? _animTimer;
     if (_socketService?.rideStatus != null) setState(() => _status = _socketService!.rideStatus!);
     final newLoc = _socketService?.driverLatLng;
     if (newLoc != null) {
-      if (_driverLatLng != null && _driverLatLng!.distanceTo(newLoc) > 0.0001) {
-        // Start smooth interpolation
-        _animTimer?.cancel();
-        _animFrom = _driverLatLng;
-        _animTo = newLoc;
-        _animStep = 0;
-        _runAnimStep();
+      if (_driverLatLng != null) {
+        final diff = (_driverLatLng!.latitude - newLoc.latitude).abs() + (_driverLatLng!.longitude - newLoc.longitude).abs();
+        if (diff > 0.0001) {
+          // Start smooth interpolation
+          _animTimer?.cancel();
+          _animFrom = _driverLatLng;
+          _animTo = newLoc;
+          _animStep = 0;
+          _runAnimStep();
+        } else {
+          setState(() {
+            _driverLatLng = newLoc;
+            _driverFound = true;
+          });
+        }
       } else {
         setState(() {
           _driverLatLng = newLoc;
