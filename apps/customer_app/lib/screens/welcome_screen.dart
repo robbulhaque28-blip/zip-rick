@@ -6,8 +6,8 @@ class WelcomeScreen extends StatelessWidget {
     backgroundColor: const Color(0xFF6C63FF),
     body: SafeArea(child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       const Spacer(flex: 2),
-      Container(width: 120, height: 120, decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
-        child: Text("V", style: TextStyle(color: Colors.white, fontSize: 60, fontWeight: FontWeight.bold))),
+      Container(width: 120, height: 120, decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(24)),
+        child: ClipRRect(borderRadius: BorderRadius.circular(20), child: Image.asset('assets/icon_square.png', width: 100, height: 100, fit: BoxFit.contain))),
       const SizedBox(height: 24),
       const Text("Vybe", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
       const SizedBox(height: 8),

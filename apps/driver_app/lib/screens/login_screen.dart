@@ -48,8 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
     padding: const EdgeInsets.all(24),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const SizedBox(height: 30),
-      Container(width: 80, height: 80, decoration: BoxDecoration(color: const Color(0xFF6C63FF).withOpacity(0.1), shape: BoxShape.circle),
-        child: const Text("V", style: TextStyle(color: Color(0xFF6C63FF), fontSize: 36, fontWeight: FontWeight.bold))),
+      Container(width: 80, height: 80, decoration: BoxDecoration(color: Color(0xFF6C63FF).withOpacity(0.1), borderRadius: BorderRadius.circular(20)), child: ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.asset('assets/icon_square.png', width: 64, height: 64, fit: BoxFit.contain, alignment: Alignment.center))),
       const SizedBox(height: 24),
       if (!_showOtp) Container(
         decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
