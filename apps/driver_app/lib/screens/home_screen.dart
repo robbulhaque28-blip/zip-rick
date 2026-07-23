@@ -7,6 +7,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
+import '../widgets/chat_bottom_sheet.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -21,6 +22,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   Map<String, dynamic>? _driverProfile; String _driverName = 'Driver';
   Timer? _pollTimer; int _bottomNavIndex = 0;
   Set<String> _declinedRideIds = {};
+  List<Map<String, dynamic>> _chatMessages = [];
+  final _chatStreamCtrl = StreamController<Map<String, dynamic>>.broadcast();
 
   @override
   void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); _fetchLocation(); _connectSocket(); _loadProfile(); }
@@ -39,6 +42,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
     });
     _socket!.on('ride:taken', (d) { if (mounted && _showingRideRequest) setState(() { _showingRideRequest = false; _rideRequest = null; }); });
     _socket!.on('ride:cancelled', (d) { if (mounted) setState(() { _hasActiveRide = false; _activeRide = null; _showingRideRequest = false; _rideRequest = null; }); });
+    _socket!.on('chat:received', (d) {
+      if (d is Map) {
+        setState(() => _chatMessages.add(d as Map<String, dynamic>));
+        _chatStreamCtrl.add(d as Map<String, dynamic>);
+      }
+    });
+    _socket!.on('chat:sent', (d) {
+      if (d is Map) {
+        setState(() => _chatMessages.add(d as Map<String, dynamic>));
+        _chatStreamCtrl.add(d as Map<String, dynamic>);
+      }
+    });
     _socket!.onDisconnect((_) => setState(() => _socketConnected = false));
     _socket!.connect();
   }
@@ -120,6 +135,22 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   }
 
   void _updateStatus(String e) { if (_socket != null && _activeRide != null) { _socket!.emit(e, {'ride_id': _activeRide!['id']}); if (e == 'ride:complete') setState(() { _hasActiveRide = false; _activeRide = null; }); } }
+
+  void _openChat() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DriverChatSheet(
+        socket: _socket,
+        rideId: _activeRide?['id']?.toString() ?? '',
+        messages: _chatMessages,
+        streamCtrl: _chatStreamCtrl,
+      ),
+    );
+  }
 
   Future<void> _callCustomer() async {
     String? p; try { p = _activeRide?['customer']?['user']?['phone']; } catch (_) {}
@@ -237,9 +268,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       if (status == 'started') _btn('Complete Ride', Icons.stop_circle, const Color(0xFF6C63FF), () => _updateStatus('ride:complete')),
       if (status == 'completed') _btn('Done', Icons.home, const Color(0xFF4CAF50), () => setState(() { _hasActiveRide = false; _activeRide = null; })),
       const SizedBox(height: 12),
-      SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _callCustomer, icon: const Icon(Icons.phone), label: const Text('Call Customer'),
+      Row(children: [
+        Expanded(child: SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _openChat, icon: const Icon(Icons.chat_rounded), label: const Text('Chat'), style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))))),
+        const SizedBox(width: 8),
+        Expanded(child: SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _callCustomer, icon: const Icon(Icons.phone), label: const Text('Call Customer'),
         style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
-    ]);
+      ]),
   }
 
   Widget _btn(String l, IconData i, Color c, VoidCallback o) => SizedBox(width: double.infinity, child: ElevatedButton.icon(onPressed: o, icon: Icon(i), label: Text(l),

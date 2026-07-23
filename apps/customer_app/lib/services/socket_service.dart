@@ -3,21 +3,52 @@ import 'package:flutter/material.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:latlong2/latlong.dart';
 
+class ChatMessage {
+  final String id;
+  final String rideId;
+  final String senderId;
+  final String senderRole;
+  final String message;
+  final DateTime createdAt;
+
+  ChatMessage({
+    required this.id,
+    required this.rideId,
+    required this.senderId,
+    required this.senderRole,
+    required this.message,
+    required this.createdAt,
+  });
+
+  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    return ChatMessage(
+      id: json['id']?.toString() ?? '',
+      rideId: json['ride_id']?.toString() ?? '',
+      senderId: json['sender_id']?.toString() ?? '',
+      senderRole: json['sender_role']?.toString() ?? '',
+      message: json['message']?.toString() ?? '',
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
+}
+
 class SocketService extends ChangeNotifier {
   io.Socket? _socket;
   bool _connected = false;
   String? _rideStatus;
-
-  // Driver location for smooth animation
   LatLng? _driverLatLng;
-  LatLng? _previousDriverLatLng;
-  double _driverHeading = 0;
+
+  // Chat messages
+  final List<ChatMessage> _chatMessages = [];
+  final StreamController<ChatMessage> _chatController = StreamController<ChatMessage>.broadcast();
 
   bool get connected => _connected;
   LatLng? get driverLatLng => _driverLatLng;
-  LatLng? get previousDriverLatLng => _previousDriverLatLng;
-  double get driverHeading => _driverHeading;
   String? get rideStatus => _rideStatus;
+  List<ChatMessage> get chatMessages => List.unmodifiable(_chatMessages);
+  Stream<ChatMessage> get chatStream => _chatController.stream;
 
   Future<void> init(String token) async {
     _socket = io.io('https://zip-rick-4.onrender.com', <String, dynamic>{
@@ -55,19 +86,26 @@ class SocketService extends ChangeNotifier {
         final loc = data as Map<String, dynamic>;
         final newLat = double.tryParse(loc['latitude']?.toString() ?? '') ?? 0;
         final newLng = double.tryParse(loc['longitude']?.toString() ?? '') ?? 0;
-        final newPoint = LatLng(newLat, newLng);
-        
-        if (_driverLatLng != null) {
-          _previousDriverLatLng = _driverLatLng;
-          // Calculate heading
-          final dx = newPoint.longitude - _driverLatLng!.longitude;
-          final dy = newPoint.latitude - _driverLatLng!.latitude;
-          _driverHeading = (dx.abs() > 0.000001 || dy.abs() > 0.000001)
-              ? (dy == 0 ? (dx > 0 ? 90 : -90) : (dx / dy) * 180 / 3.14159)
-              : _driverHeading;
-        }
-        
-        _driverLatLng = newPoint;
+        _driverLatLng = LatLng(newLat, newLng);
+        notifyListeners();
+      }
+    });
+
+    // Chat events
+    _socket!.on('chat:received', (data) {
+      if (data is Map) {
+        final msg = ChatMessage.fromJson(data as Map<String, dynamic>);
+        _chatMessages.add(msg);
+        _chatController.add(msg);
+        notifyListeners();
+      }
+    });
+
+    _socket!.on('chat:sent', (data) {
+      if (data is Map) {
+        final msg = ChatMessage.fromJson(data as Map<String, dynamic>);
+        _chatMessages.add(msg);
+        _chatController.add(msg);
         notifyListeners();
       }
     });
@@ -80,11 +118,19 @@ class SocketService extends ChangeNotifier {
     _socket!.connect();
   }
 
+  void sendChat(String rideId, String message) {
+    _socket?.emit('chat:send', {
+      'ride_id': rideId,
+      'message': message,
+    });
+  }
+
   void emit(String event, Map data) {
     _socket?.emit(event, data);
   }
 
   void dispose() {
+    _chatController.close();
     _socket?.disconnect();
     _socket?.dispose();
     super.dispose();

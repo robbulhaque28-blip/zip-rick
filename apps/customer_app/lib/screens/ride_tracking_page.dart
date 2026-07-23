@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
+import '../widgets/chat_bottom_sheet.dart';
 
 final ApiService _api = ApiService();
 
@@ -131,6 +132,21 @@ Timer? _animTimer;
     } catch (_) {}
   }
 
+  void _openChat() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => ChatBottomSheet(
+        socketService: _socketService!,
+        rideId: widget.rideData['id']?.toString() ?? '',
+        userRole: 'customer',
+      ),
+    );
+  }
+
   void _shareRide() {
     Clipboard.setData(ClipboardData(text: "I'm riding with Vybe!\n📍 ${widget.rideData["pickup_address"] ?? "N/A"}\n🏁 ${widget.rideData["drop_address"] ?? "N/A"}\n💰 ₹${widget.rideData["total_fare"] ?? 0}"));
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Trip details copied!")));
@@ -144,6 +160,7 @@ Timer? _animTimer;
     if (_rideCompleted) return _buildRatingPage();
     return Scaffold(
       appBar: AppBar(title: Text(_statusText()), actions: [
+        IconButton(icon: const Icon(Icons.chat_rounded), onPressed: _openChat),
         IconButton(icon: const Icon(Icons.share_rounded), onPressed: _shareRide),
       ]),
       body: Column(children: [
