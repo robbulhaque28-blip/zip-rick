@@ -28,6 +28,9 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
   SocketService? _socketService;
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseAnim;
+  
+  // Smooth driver animation
+
 
   @override
   void initState() {
@@ -55,20 +58,50 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
     _socketService!.addListener(_onSocketUpdate);
   }
 
+Timer? _animTimer;
+  int _animStep = 0;
+  LatLng? _animFrom;
+  LatLng? _animTo;
+  static const int _totalSteps = 20;
+
   void _onSocketUpdate() {
     if (!mounted) return;
     if (_socketService?.rideStatus != null) setState(() => _status = _socketService!.rideStatus!);
-    if (_socketService?.driverLocation != null) {
-      final loc = _socketService!.driverLocation!;
+    final newLoc = _socketService?.driverLatLng;
+    if (newLoc != null) {
+      if (_driverLatLng != null && _driverLatLng!.distanceTo(newLoc) > 0.0001) {
+        // Start smooth interpolation
+        _animTimer?.cancel();
+        _animFrom = _driverLatLng;
+        _animTo = newLoc;
+        _animStep = 0;
+        _runAnimStep();
+      } else {
+        setState(() {
+          _driverLatLng = newLoc;
+          _driverFound = true;
+        });
+      }
+      _driverFound = true;
+      _mapCtrl.move(newLoc, 15);
+    }
+  }
+
+  void _runAnimStep() {
+    _animTimer = Timer(const Duration(milliseconds: 50), () {
+      if (!mounted || _animFrom == null || _animTo == null) return;
+      _animStep++;
+      final t = _animStep / _totalSteps;
       setState(() {
         _driverLatLng = LatLng(
-          double.tryParse(loc['latitude']?.toString() ?? '') ?? 0,
-          double.tryParse(loc['longitude']?.toString() ?? '') ?? 0,
+          _animFrom!.latitude + (_animTo!.latitude - _animFrom!.latitude) * t,
+          _animFrom!.longitude + (_animTo!.longitude - _animFrom!.longitude) * t,
         );
-        _driverFound = true;
       });
-      _mapCtrl.move(_driverLatLng!, 15);
-    }
+      if (_animStep < _totalSteps) {
+        _runAnimStep();
+      }
+    });
   }
 
   void _startPolling() {
@@ -112,7 +145,7 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
               TileLayer(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", userAgentPackageName: "com.vybe.customer"),
               MarkerLayer(markers: [
                 Marker(point: _pickupLatLng, width: 40, height: 40, child: const Icon(Icons.location_on, color: Colors.green, size: 35)),
-                if (_driverLatLng != null) Marker(point: _driverLatLng!, width: 60, height: 60,
+if (_driverLatLng != null) Marker(point: _driverLatLng!, width: 60, height: 60,
                   child: AnimatedBuilder(animation: _pulseAnim, builder: (ctx, child) => Transform.scale(scale: _pulseAnim.value,
                     child: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF6C63FF).withOpacity(0.2), shape: BoxShape.circle),
                       child: const Icon(Icons.electric_rickshaw_rounded, size: 28, color: Color(0xFF6C63FF)))))),

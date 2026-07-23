@@ -1,14 +1,22 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
-import 'package:flutter/foundation.dart';
+import 'package:latlong2/latlong.dart';
 
 class SocketService extends ChangeNotifier {
   io.Socket? _socket;
   bool _connected = false;
-  Map<String, dynamic>? _driverLocation;
   String? _rideStatus;
 
+  // Driver location for smooth animation
+  LatLng? _driverLatLng;
+  LatLng? _previousDriverLatLng;
+  double _driverHeading = 0;
+
   bool get connected => _connected;
-  Map<String, dynamic>? get driverLocation => _driverLocation;
+  LatLng? get driverLatLng => _driverLatLng;
+  LatLng? get previousDriverLatLng => _previousDriverLatLng;
+  double get driverHeading => _driverHeading;
   String? get rideStatus => _rideStatus;
 
   Future<void> init(String token) async {
@@ -20,36 +28,46 @@ class SocketService extends ChangeNotifier {
     _socket!.onConnect((_) {
       _connected = true;
       notifyListeners();
-      debugPrint('Socket connected');
     });
 
     _socket!.on('ride:accepted', (data) {
       _rideStatus = 'accepted';
       notifyListeners();
-      debugPrint('Ride accepted: $data');
     });
 
     _socket!.on('ride:driver_arrived', (data) {
       _rideStatus = 'arrived';
       notifyListeners();
-      debugPrint('Driver arrived');
     });
 
     _socket!.on('ride:started', (data) {
       _rideStatus = 'started';
       notifyListeners();
-      debugPrint('Ride started');
     });
 
     _socket!.on('ride:completed', (data) {
       _rideStatus = 'completed';
       notifyListeners();
-      debugPrint('Ride completed');
     });
 
     _socket!.on('ride:driver_location', (data) {
       if (data is Map) {
-        _driverLocation = data as Map<String, dynamic>;
+        final loc = data as Map<String, dynamic>;
+        final newLat = double.tryParse(loc['latitude']?.toString() ?? '') ?? 0;
+        final newLng = double.tryParse(loc['longitude']?.toString() ?? '') ?? 0;
+        final newPoint = LatLng(newLat, newLng);
+        
+        if (_driverLatLng != null) {
+          _previousDriverLatLng = _driverLatLng;
+          // Calculate heading
+          final dx = newPoint.longitude - _driverLatLng!.longitude;
+          final dy = newPoint.latitude - _driverLatLng!.latitude;
+          _driverHeading = (dx.abs() > 0.000001 || dy.abs() > 0.000001)
+              ? (dy == 0 ? (dx > 0 ? 90 : -90) : (dx / dy) * 180 / 3.14159)
+              : _driverHeading;
+        }
+        
+        _driverLatLng = newPoint;
         notifyListeners();
       }
     });
@@ -57,7 +75,6 @@ class SocketService extends ChangeNotifier {
     _socket!.onDisconnect((_) {
       _connected = false;
       notifyListeners();
-      debugPrint('Socket disconnected');
     });
 
     _socket!.connect();
