@@ -64,7 +64,7 @@ class _RideDetailPageState extends State<RideDetailPage> {
         Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text('Ride #${r['ride_number'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            Chip(label: Text(status), size: 'small' as dynamic, color: status == 'completed' ? const Color(0xFF4CAF50) : const Color(0xFFFFA726)),
+            Chip(label: Text(status), backgroundColor: status == 'completed' ? const Color(0xFF4CAF50).withOpacity(0.2) : const Color(0xFFFFA726).withOpacity(0.2)),
           ]),
           const Divider(height: 20),
           Row(children: [const Icon(Icons.circle, color: Colors.green, size: 12), const SizedBox(width: 8), Expanded(child: Text(r['pickup_address'] ?? 'Pickup', style: const TextStyle(fontSize: 14)))]),
