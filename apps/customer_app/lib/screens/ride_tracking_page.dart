@@ -160,7 +160,7 @@ Timer? _animTimer;
     if (_rideCompleted) return _buildRatingPage();
     return Scaffold(
       appBar: AppBar(title: Text(_statusText()), actions: [
-        IconButton(icon: const Icon(Icons.chat_rounded), onPressed: _openChat),
+        if (_driverFound) IconButton(icon: const Icon(Icons.chat_rounded), onPressed: _openChat),
         IconButton(icon: const Icon(Icons.share_rounded), onPressed: _shareRide),
       ]),
       body: Column(children: [

@@ -6,7 +6,7 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const { User, Driver, Ride, ChatMessage } = require('../models');
+const { User, Driver, Customer, Ride, ChatMessage } = require('../models');
 const RideMatchingService = require('../services/RideMatchingService');
 const logger = require('../utils/logger');
 
@@ -290,8 +290,8 @@ function setupSocketIO(server) {
         // Broadcast to other participant
         const otherUserId =
           userRole === 'customer'
-            ? await this._getDriverUserId(ride.driver_id)
-            : await this._getCustomerUserId(ride.customer_id);
+            ? await _getDriverUserId(ride.driver_id)
+            : await _getCustomerUserId(ride.customer_id);
 
         if (otherUserId) {
           io.to(`user:${otherUserId}`).emit('chat:received', {
