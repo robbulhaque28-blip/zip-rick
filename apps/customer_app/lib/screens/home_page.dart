@@ -93,22 +93,19 @@ class _HomePageState extends State<HomePage> {
     _mapCtrl.move(ll, 15);
   }
 
-  bool _bookingInProgress = false;
-
   void _showBookingPanel() {
     showModalBottomSheet(context: context, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: StatefulBuilder(builder: (ctx, setSheet) {
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setSheet) {
         return SingleChildScrollView(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
           padding: const EdgeInsets.all(24),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
               Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
               const SizedBox(height: 20),
               const Text("Where to?", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
-              // Saved places chips
               if (_savedPlaces.isNotEmpty) ...[
                 SizedBox(height: 40, child: ListView(scrollDirection: Axis.horizontal, children: [
                   ..._savedPlaces.map((p) => Padding(padding: const EdgeInsets.only(right: 8), child: ActionChip(
@@ -128,7 +125,6 @@ class _HomePageState extends State<HomePage> {
                   TextField(controller: _dropCtrl, decoration: InputDecoration(labelText: "Drop", prefixIcon: const Icon(Icons.location_on, color: Colors.red, size: 12), border: InputBorder.none, contentPadding: const EdgeInsets.all(16)), onChanged: (v) => _searchPlaces(v, false)),
                   ..._searchResults.where((p) => p["isPickup"] == false).take(3).map((p) => ListTile(dense: true, leading: const Icon(Icons.location_on, size: 16), title: Text(p["display_name"].toString(), style: const TextStyle(fontSize: 13)), onTap: () { _selectPlace(p); setSheet(() {}); })),
                 ])),
-              // Ride mode selector
               Container(padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                 child: Row(children: [
                   Expanded(child: GestureDetector(
@@ -156,12 +152,11 @@ class _HomePageState extends State<HomePage> {
                 onPressed: _pickupLoc == null || _dropLoc == null ? null : () { Navigator.pop(ctx); _getFare(); },
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                 child: const Text("Search for Ride", style: TextStyle(fontSize: 16)))),
-          ])),
-        );
-      }),
-    ),
-  );
-}
+          ]))));
+        }),
+      ),
+    );
+  }
 
   Future<void> _getFare() async {
     if (_bookingInProgress) return;
