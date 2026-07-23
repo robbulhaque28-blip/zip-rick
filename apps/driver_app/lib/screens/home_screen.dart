@@ -273,6 +273,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
         const SizedBox(width: 8),
         Expanded(child: OutlinedButton.icon(onPressed: _callCustomer, icon: const Icon(Icons.phone), label: const Text('Call'), style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
       ]),
+    ]);
   }
 
   Widget _btn(String l, IconData i, Color c, VoidCallback o) => SizedBox(width: double.infinity, child: ElevatedButton.icon(onPressed: o, icon: Icon(i), label: Text(l),
