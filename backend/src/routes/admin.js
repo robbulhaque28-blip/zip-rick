@@ -231,14 +231,16 @@ router.get('/revenue', asyncHandler(async (req, res) => {
 }));
 
 router.get('/promo-codes', asyncHandler(async (req, res) => {
-  const codes = await PromoCode.findAll({ include: ['redemptions'], order: [['created_at','DESC']] });
+  const codes = await PromoCode.findAll({ order: [['created_at','DESC']] });
   return success(res, { promo_codes: codes });
 }));
 router.post('/promo-codes', asyncHandler(async (req, res) => {
   const a = await AdminUser.findOne({ where: { user_id: req.userId } });
+  const val = req.body.discount_value || req.body.discount || 10;
   const data = {
     code: req.body.code,
-    discount_value: req.body.discount_value || req.body.discount || 10,
+    discount: val,
+    discount_value: val,
     discount_type: req.body.discount_type || 'percentage',
     max_uses: req.body.max_uses || 100,
     min_fare: req.body.min_fare || 0,

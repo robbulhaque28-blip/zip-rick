@@ -4,6 +4,7 @@ class PromoCode extends Model {}
 PromoCode.init({
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
     code: { type: DataTypes.STRING, allowNull: false, unique: true },
+    discount: { type: DataTypes.DECIMAL(5, 2), defaultValue: 10 },
     discount_value: { type: DataTypes.DECIMAL(5, 2), defaultValue: 10 },
     discount_type: { type: DataTypes.STRING, defaultValue: 'percentage' },
     max_uses: { type: DataTypes.INTEGER, defaultValue: 100 },
