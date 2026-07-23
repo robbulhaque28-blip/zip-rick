@@ -16,6 +16,10 @@ const adminRoutes = require('./admin');
 const webhookRoutes = require('./webhooks');
 
 // Health check
+router.get('/version', (req, res) => {
+  res.json({ success: true, data: { version: '1.0.0', min_version: '1.0.0', app_name: 'Vybe' } });
+});
+
 router.get('/health', (req, res) => {
   res.json({
     success: true,

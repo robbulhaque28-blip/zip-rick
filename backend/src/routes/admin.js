@@ -185,7 +185,15 @@ router.get('/rides/active', asyncHandler(async (req, res) => {
 
 router.get('/settings/fare', asyncHandler(async (req, res) => {
   const s = await SystemSetting.findOne({ where: { key: 'fare_rates' } });
-  return success(res, { fare_rates: s?.value||{} });
+  const defaults = {
+    single_base_fare: 30, single_per_km: 12, single_per_minute: 1,
+    sharing_base_fare: 20, sharing_per_km: 8, sharing_per_minute: 0.5,
+    minimum_fare: 30, night_charge_multiplier: 1.5, peak_multiplier: 1.2,
+    night_start_hour: 22, night_end_hour: 6,
+    peak_hours: [{ start: 8, end: 10 }, { start: 17, end: 20 }],
+    cancellation_fee_customer: 10
+  };
+  return success(res, { fare_rates: { ...defaults, ...(s?.value||{}) } });
 }));
 router.put('/settings/fare', asyncHandler(async (req, res) => {
   const existing = (await SystemSetting.findOne({ where: { key: 'fare_rates' } }))?.value||{};

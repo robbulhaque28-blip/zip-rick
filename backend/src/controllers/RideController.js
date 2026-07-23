@@ -86,6 +86,7 @@ module.exports = {
     // Check if this is a scheduled ride
     const isScheduled = req.body.scheduled_at && new Date(req.body.scheduled_at) > new Date();
     if (isScheduled) {
+      ride.ride_otp = String(Math.floor(1000 + Math.random() * 9000));
       ride.status = 'scheduled';
       await ride.save();
       await RideStatusLog.create({ ride_id: ride.id, previous_status: 'pending', new_status: 'scheduled', changed_by: 'customer' });

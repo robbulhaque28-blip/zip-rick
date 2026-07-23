@@ -30,8 +30,16 @@ class RideMatchingService {
       const dLng = (parseFloat(d.current_longitude) - lng) * Math.PI / 180;
       const a = Math.sin(dLat/2)**2 + Math.cos(lat*Math.PI/180) * Math.cos(parseFloat(d.current_latitude)*Math.PI/180) * Math.sin(dLng/2)**2;
       const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return { driver: d, distance_km: dist };
-    }).filter(d => d.distance_km <= radiusKm).sort((a, b) => a.distance_km - b.distance_km);
+      // Check destination filter
+    if (d.destination_latitude && d.destination_longitude && d.destination_radius_km) {
+      const destDist = _calcDistKm(parseFloat(d.current_latitude), parseFloat(d.current_longitude), 
+                                     parseFloat(d.destination_latitude), parseFloat(d.destination_longitude));
+      const pickupDist = _calcDistKm(lat, lng, 
+                                      parseFloat(d.destination_latitude), parseFloat(d.destination_longitude));
+      if (pickupDist > parseFloat(d.destination_radius_km)) return null;
+    }
+    return { driver: d, distance_km: dist };
+    }).filter(d => d !== null && d.distance_km <= radiusKm).sort((a, b) => a.distance_km - b.distance_km);
   }
 
   async startSearch(ride, onDriverFound, onNoDrivers) {
@@ -185,6 +193,23 @@ class RideMatchingService {
       this.searchTimeouts.delete(rideId);
     }
   }
+}
+
+  _calcDistKm(lat1, lng1, lat2, lng2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+}
+
+function _calcDistKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
 module.exports = new RideMatchingService();

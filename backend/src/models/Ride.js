@@ -42,6 +42,8 @@ Ride.init({
     defaultValue: 'pending',
   },
   scheduled_at: { type: DataTypes.DATE, allowNull: true },
+  ride_otp: { type: DataTypes.STRING(4), allowNull: true },
+  destination_filter: { type: DataTypes.TEXT, allowNull: true },
   cancellation_reason: { type: DataTypes.TEXT, allowNull: true },
   cancelled_by: { type: DataTypes.ENUM('customer', 'driver', 'system', 'admin'), allowNull: true },
   cancelled_at: { type: DataTypes.DATE, allowNull: true },

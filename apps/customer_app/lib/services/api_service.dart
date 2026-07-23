@@ -120,6 +120,11 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  Future<Map<String, dynamic>> getRideDetail(String rideId) async {
+    final res = await http.get(Uri.parse(baseUrl + '/rides/' + rideId), headers: await _headers());
+    return jsonDecode(res.body);
+  }
+
   Future<Map<String, dynamic>> rateRide(String rideId, int rating) async {
     final res = await http.post(Uri.parse(baseUrl + '/rides/' + rideId + '/rate'), headers: await _headers(), body: jsonEncode({'rating': rating}));
     return jsonDecode(res.body);

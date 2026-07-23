@@ -117,4 +117,41 @@ router.post("/registration/pay", asyncHandler(async (req, res) => {
   return success(res, { message: "Payment successful", registration_fee_paid: true }, "Payment recorded");
 }));
 
+// Set destination filter
+router.post('/destination', asyncHandler(async (req, res) => {
+  const driver = await Driver.findOne({ where: { user_id: req.userId } });
+  if (!driver) throw new ApiError(404, 'Driver not found');
+  driver.destination_latitude = req.body.latitude || null;
+  driver.destination_longitude = req.body.longitude || null;
+  driver.destination_address = req.body.address || null;
+  driver.destination_radius_km = req.body.radius_km || 2.0;
+  await driver.save();
+  return success(res, { destination: { latitude: driver.destination_latitude, longitude: driver.destination_longitude, address: driver.destination_address, radius_km: driver.destination_radius_km } }, 'Destination filter set');
+}));
+
+// Clear destination filter
+router.delete('/destination', asyncHandler(async (req, res) => {
+  const driver = await Driver.findOne({ where: { user_id: req.userId } });
+  if (!driver) throw new ApiError(404, 'Driver not found');
+  driver.destination_latitude = null;
+  driver.destination_longitude = null;
+  driver.destination_address = null;
+  await driver.save();
+  return success(res, null, 'Destination filter cleared');
+}));
+
+// Verify ride OTP
+router.post('/verify-otp', asyncHandler(async (req, res) => {
+  const driver = await Driver.findOne({ where: { user_id: req.userId } });
+  if (!driver) throw new ApiError(404, 'Driver not found');
+  const ride = await Ride.findByPk(req.body.ride_id);
+  if (!ride) throw new ApiError(404, 'Ride not found');
+  if (ride.driver_id !== driver.id) throw new ApiError(403, 'Not your ride');
+  if (ride.ride_otp !== req.body.otp) throw new ApiError(400, 'Invalid OTP');
+  ride.status = 'started';
+  ride.ride_started_at = new Date();
+  await ride.save();
+  return success(res, { ride }, 'Ride verified and started');
+}));
+
 module.exports = router;

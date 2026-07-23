@@ -22,6 +22,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   Map<String, dynamic>? _driverProfile; String _driverName = 'Driver';
   Timer? _pollTimer; int _bottomNavIndex = 0;
   Set<String> _declinedRideIds = {};
+  String? _destAddress;
   List<Map<String, dynamic>> _chatMessages = [];
   final _chatStreamCtrl = StreamController<Map<String, dynamic>>.broadcast();
 
@@ -135,6 +136,31 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   }
 
   void _updateStatus(String e) { if (_socket != null && _activeRide != null) { _socket!.emit(e, {'ride_id': _activeRide!['id']}); if (e == 'ride:complete') setState(() { _hasActiveRide = false; _activeRide = null; }); } }
+
+  void _showDestDialog() {
+    showDialog(context: context, builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text('Destination Filter'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('Set where you\'re heading to get rides along your route.', style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF))),
+        const SizedBox(height: 12),
+        TextField(decoration: InputDecoration(labelText: 'Enter destination', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
+        const SizedBox(height: 8),
+        TextField(decoration: InputDecoration(labelText: 'Search radius (km)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), suffixText: 'km'), keyboardType: TextInputType.number),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          const Text('Active', style: TextStyle(fontSize: 14)),
+          Switch(value: true, onChanged: (v) {}),
+        ]),
+      ]), actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+        ElevatedButton(onPressed: () {
+          setState(() => _destAddress = 'Destination set');
+          Navigator.pop(ctx);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Destination filter active!')));
+        }, child: const Text('Set Destination')),
+      ],
+    ));
+  }
 
   void _openChat() {
     showModalBottomSheet(
@@ -255,6 +281,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
         child: Row(children: [Icon(Icons.info_outline, color: sc, size: 32), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Status: $st', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: sc)),
           Text('Fare: ₹${r['total_fare'] ?? '--'}', style: const TextStyle(fontSize: 14, color: Color(0xFF9CA3AF))),
+          if (r['ride_otp'] != null) Text('Ride OTP: ${r['ride_otp']}', style: const TextStyle(fontSize: 14, color: Color(0xFFFFA726), fontWeight: FontWeight.bold)),
         ]))])),
       const SizedBox(height: 16),
       Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
@@ -326,6 +353,33 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
           const SizedBox(width: 12),
           Expanded(child: _ec('Week', '₹${d['week_earnings'] ?? '0'}', Icons.date_range, const Color(0xFFFFA726))),
         ]),
+        const SizedBox(height: 16),
+        // Weekly bar chart
+        Container(width: double.infinity, padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('This Week', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1F2937))),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 100,
+              child: Row(children: [
+                ...((d['daily_earnings'] as List?) ?? []).map<Widget>((day) {
+                  final maxAmount = ((d['daily_earnings'] as List?) ?? []).fold<double>(0, (p, x) => (x['amount'] ?? 0) > p ? (x['amount'] ?? 0).toDouble() : p);
+                  final amount = (day['amount'] ?? 0).toDouble();
+                  final height = maxAmount > 0 ? (amount / maxAmount * 80).clamp(4, 80) : 4.0;
+                  return Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 2), child: Column(mainAxisAlignment: MainAxisAlignment.end, crossAxisAlignment: CrossAxisAlignment.center, children: [
+                    Text('₹${amount.toInt()}', style: const TextStyle(fontSize: 9, color: Color(0xFF6C63FF), fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Container(width: double.infinity, height: height, decoration: BoxDecoration(
+                      color: const Color(0xFF6C63FF).withOpacity(0.7), borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                    )),
+                    const SizedBox(height: 4),
+                    Text(day['day'] ?? '', style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF))),
+                  ])));
+                }),
+              ]),
+            ),
+          ])),
         const SizedBox(height: 12),
         // Monthly earnings card
         Container(width: double.infinity, padding: const EdgeInsets.all(20),

@@ -28,8 +28,8 @@ export default function SettingsPage() {
   const [fare, setFare] = useState({
     single_base_fare: 30, single_per_km: 12, single_per_minute: 1,
     sharing_base_fare: 20, sharing_per_km: 8, sharing_per_minute: 0.5,
-    minimum_fare: 30, night_charge_multiplier: 1.5,
-    peak_multiplier: 1.2, cancellation_fee_customer: 10
+    minimum_fare: 30, night_charge_multiplier: 1.5, night_start_hour: 22, night_end_hour: 6,
+    peak_multiplier: 1.2, peak_hours: [{ start: 8, end: 10 }, { start: 17, end: 20 }], cancellation_fee_customer: 10
   });
   const [fee, setFee] = useState({ promotional: 499, standard: 999, promotion_active: true });
   const [commission, setCommission] = useState({ rate: 10 });
@@ -122,7 +122,27 @@ export default function SettingsPage() {
                 <Field label="Night Multiplier" value={fare.night_charge_multiplier} onChange={e => setFare({...fare, night_charge_multiplier: parseFloat(e.target.value) || 1.5})} inputProps={{ step: 0.1 }} />
                 <Field label="Peak Multiplier" value={fare.peak_multiplier} onChange={e => setFare({...fare, peak_multiplier: parseFloat(e.target.value) || 1.2})} inputProps={{ step: 0.1 }} />
                 <Field label="Cancellation Fee (₹)" value={fare.cancellation_fee_customer} onChange={e => setFare({...fare, cancellation_fee_customer: parseFloat(e.target.value) || 10})} />
-                <Button variant="contained" onClick={saveFare} sx={{ alignSelf: 'flex-start', mt: 1 }}>Save All Fare Rates</Button>
+                <Box sx={{ borderTop: '1px solid #eee', pt: 2, mt: 1 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>Night Charge Hours</Typography>
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Field label="Start Hour (0-23)" value={fare.night_start_hour} onChange={e => setFare({...fare, night_start_hour: parseInt(e.target.value) || 22})} />
+                    <Field label="End Hour (0-23)" value={fare.night_end_hour} onChange={e => setFare({...fare, night_end_hour: parseInt(e.target.value) || 6})} />
+                  </Box>
+                </Box>
+                <Box sx={{ borderTop: '1px solid #eee', pt: 2 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>Peak Hours</Typography>
+                  <Typography variant="caption" color="text.secondary">Morning peak: {fare.peak_hours?.[0]?.start || 8}:00 - {fare.peak_hours?.[0]?.end || 10}:00</Typography>
+                  <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+                    <Field label="Peak 1 Start" value={fare.peak_hours?.[0]?.start || 8} onChange={e => { const h = [...(fare.peak_hours || [{start:8,end:10},{start:17,end:20}])]; h[0].start = parseInt(e.target.value) || 8; setFare({...fare, peak_hours: h}); }} />
+                    <Field label="Peak 1 End" value={fare.peak_hours?.[0]?.end || 10} onChange={e => { const h = [...(fare.peak_hours || [{start:8,end:10},{start:17,end:20}])]; h[0].end = parseInt(e.target.value) || 10; setFare({...fare, peak_hours: h}); }} />
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>Evening peak: {fare.peak_hours?.[1]?.start || 17}:00 - {fare.peak_hours?.[1]?.end || 20}:00</Typography>
+                  <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+                    <Field label="Peak 2 Start" value={fare.peak_hours?.[1]?.start || 17} onChange={e => { const h = [...(fare.peak_hours || [{start:8,end:10},{start:17,end:20}])]; h[1].start = parseInt(e.target.value) || 17; setFare({...fare, peak_hours: h}); }} />
+                    <Field label="Peak 2 End" value={fare.peak_hours?.[1]?.end || 20} onChange={e => { const h = [...(fare.peak_hours || [{start:8,end:10},{start:17,end:20}])]; h[1].end = parseInt(e.target.value) || 20; setFare({...fare, peak_hours: h}); }} />
+                  </Box>
+                </Box>
+                <Button variant="contained" onClick={saveFare} sx={{ alignSelf: 'flex-start', mt: 2 }}>Save All Fare Rates</Button>
               </Box>
             </CardContent>
           </Card>

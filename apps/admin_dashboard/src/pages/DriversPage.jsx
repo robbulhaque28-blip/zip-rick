@@ -136,7 +136,7 @@ export default function DriversPage() {
               {(docDialog.documents || []).length === 0 && <Typography color="text.secondary">No documents uploaded</Typography>}
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {(docDialog.documents || []).map((doc, i) => {
-                  const isImage = doc.document_url && (doc.document_url.startsWith('data:image') || doc.document_url.match(/\.(jpg|jpeg|png|gif)$/i));
+                  const isImage = doc.document_url && (doc.document_url.startsWith('data:image') || doc.document_url.split('.').pop().toLowerCase().match(/^(jpg|jpeg|png|gif)$/));
                   return (
                     <Box key={i} sx={{ p: 2, bgcolor: '#FAFAFA', borderRadius: 2, border: '1px solid #eee' }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>

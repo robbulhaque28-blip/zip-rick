@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import 'ride_detail_page.dart';
 
 final ApiService _api = ApiService();
 
@@ -34,7 +35,7 @@ class _RideHistoryPageState extends State<RideHistoryPage> {
                 title: Text("Ride #${r["ride_number"] ?? ""}", style: const TextStyle(fontWeight: FontWeight.w600)),
                 subtitle: Text(dateStr, style: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
                 trailing: Text("₹$fare", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF6C63FF))),
-                onTap: () { Clipboard.setData(ClipboardData(text: "Ride #${r["ride_number"] ?? ""}: ${r["pickup_address"] ?? ""} → ${r["drop_address"] ?? ""}, ₹$fare")); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Details copied!"))); },
+                onTap: () { Navigator.push(context, MaterialPageRoute(builder: (_) => RideDetailPage(ride: r))); },
               ));
           })),
   );
