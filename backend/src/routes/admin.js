@@ -236,11 +236,9 @@ router.get('/promo-codes', asyncHandler(async (req, res) => {
 }));
 router.post('/promo-codes', asyncHandler(async (req, res) => {
   const a = await AdminUser.findOne({ where: { user_id: req.userId } });
-  const val = req.body.discount_value || req.body.discount || 10;
   const data = {
     code: req.body.code,
-    discount: val,
-    discount_value: val,
+    discount: req.body.discount_value || req.body.discount || 10,
     discount_type: req.body.discount_type || 'percentage',
     max_uses: req.body.max_uses || 100,
     min_fare: req.body.min_fare || 0,

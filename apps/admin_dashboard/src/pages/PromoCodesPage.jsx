@@ -60,7 +60,7 @@ export default function PromoCodesPage() {
             {codes.map(c => (
               <TableRow key={c.id}>
                 <TableCell><Chip label={c.code} color="primary" size="small" /></TableCell>
-                <TableCell>{c.discount_type === 'percentage' ? (c.discount_value || c.discount || 0) + '%' : '₹' + (c.discount_value || c.discount || 0)}</TableCell>
+                <TableCell>{c.discount_type === 'percentage' ? (c.discount || 0) + '%' : '₹' + (c.discount || 0)}</TableCell>
                 <TableCell>{c.usage_count || 0}</TableCell>
                 <TableCell>{c.max_uses || '∞'}</TableCell>
                 <TableCell>₹{c.min_fare || 0}</TableCell>
