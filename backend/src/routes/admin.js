@@ -395,6 +395,17 @@ router.get('/reports/revenue', asyncHandler(async (req, res) => {
   res.send(csv);
 }));
 
+// Run SQL migration queries
+router.post('/query', asyncHandler(async (req, res) => {
+  if (!req.body.sql || typeof req.body.sql !== 'string') throw new ApiError(400, 'SQL query required');
+  try {
+    const result = await sequelize.query(req.body.sql);
+    return success(res, { result }, 'Query executed');
+  } catch (e) {
+    throw new ApiError(400, e.message);
+  }
+}));
+
 // Cleanup - Delete all test data (keeps admin users and system settings)
 router.post('/cleanup', asyncHandler(async (req, res) => {
   // Get admin user IDs to preserve
