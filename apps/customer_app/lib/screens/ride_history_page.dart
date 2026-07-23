@@ -13,7 +13,14 @@ class _RideHistoryPageState extends State<RideHistoryPage> {
   List _rides = []; bool _loading = true;
   @override void initState() { super.initState(); _load(); }
   Future<void> _load() async {
-    try { final r = await _api.getRideHistory(); if (r["success"]) { final d = r["data"]; setState(() { _rides = d["rides"] ?? d["rows"] ?? []; _loading = false; }); } } catch (_) { setState(() => _loading = false); }
+    try { 
+      final r = await _api.getRideHistory(); 
+      if (r["success"]) { 
+        final d = r["data"]; 
+        final rides = d["rides"] ?? d["rows"] ?? [];
+        setState(() { _rides = rides is List ? rides : []; _loading = false; }); 
+      } else { setState(() => _loading = false); }
+    } catch (e) { setState(() => _loading = false); }
   }
   @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text("My Rides")),
     body: _loading

@@ -93,15 +93,17 @@ class _HomePageState extends State<HomePage> {
     _mapCtrl.move(ll, 15);
   }
 
+  bool _bookingInProgress = false;
+
   void _showBookingPanel() {
     showModalBottomSheet(context: context, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => StatefulBuilder(builder: (ctx, setSheet) {
-        return Container(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: StatefulBuilder(builder: (ctx, setSheet) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
               Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
               const SizedBox(height: 20),
               const Text("Where to?", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
@@ -154,20 +156,21 @@ class _HomePageState extends State<HomePage> {
                 onPressed: _pickupLoc == null || _dropLoc == null ? null : () { Navigator.pop(ctx); _getFare(); },
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                 child: const Text("Search for Ride", style: TextStyle(fontSize: 16)))),
-            ])),
+          ])),
         );
-      }),
-    );
+      })),
   }
 
   Future<void> _getFare() async {
+    if (_bookingInProgress) return;
+    _bookingInProgress = true;
     if (_pickupLoc == null || _dropLoc == null) return;
     setState(() => _isBooking = true);
     try {
       final r = await _api.getFareEstimate(_pickupLoc!.latitude, _pickupLoc!.longitude, _dropLoc!.latitude, _dropLoc!.longitude, rideMode: _rideMode);
-      if (r["success"]) { setState(() => _isBooking = false); _showPayment((r["data"]?["total_fare"] ?? 30).toInt(), r["data"]); }
-      else { setState(() => _isBooking = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r["error"]?["message"] ?? "Error"))); }
-    } catch (e) { setState(() => _isBooking = false); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection error"))); }
+      if (r["success"]) { setState(() => _isBooking = false); _bookingInProgress = false; _showPayment((r["data"]?["total_fare"] ?? 30).toInt(), r["data"]); }
+      else { setState(() => _isBooking = false); _bookingInProgress = false; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r["error"]?["message"] ?? "Error"))); }
+    } catch (e) { setState(() => _isBooking = false); _bookingInProgress = false; ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection error"))); }
   }
 
   void _showPayment(int amount, Map<String, dynamic>? fare) {
