@@ -49,31 +49,20 @@ export default function DashboardPage() {
     day: d.date ? d.date.slice(5) : '',
     revenue: parseFloat(d.total_revenue || 0),
   }));
-  // If no data, show last 7 days with zeroes
-  // Always show last 7 days with proper formatting
-  const last7Days = [];
+  // Always show last 7 days
+  const rawData = chartData;
+  chartData = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const dayLabel = d.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' });
-    const match = chartData.find(x => {
-      const xDate = x.day.length === 10 ? new Date(x.day + 'T00:00:00') : null;
-      return xDate && xDate.toDateString() === d.toDateString();
+    const match = rawData.find(x => {
+      try {
+        const xd = new Date(x.day + 'T00:00:00');
+        return xd.toDateString() === d.toDateString();
+      } catch(e) { return false; }
     });
-    last7Days.push({ day: dayLabel, revenue: match ? parseFloat(match.revenue || 0) : 0 });
-  }
-  chartData = last7Days;
-  
-  // Fallback if chartData is empty
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dayStr = d.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' });
-      chartData.push({ day: dayStr, revenue: 0 });
-    }
-  } else {
-    // Show last 7 days from real data
-    chartData = chartData.slice(-7);
+    chartData.push({ day: dayLabel, revenue: match ? parseFloat(match.revenue || 0) : 0 });
   }
 
   return (

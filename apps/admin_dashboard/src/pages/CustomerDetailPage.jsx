@@ -84,27 +84,6 @@ export default function CustomerDetailPage() {
             </TableContainer>
           </CardContent></Card>
         </Grid>
-      </Grid>
-    </Box>
-  );
-}
-
-        <Grid item xs={12}>
-          <Card sx={{ border: '2px solid #f44336' }}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: '#f44336' }}>Danger Zone</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Permanently delete this customer and all their data.
-              </Typography>
-              <Button variant="contained" color="error" onClick={() => {
-                if (!window.confirm('Delete this customer and all their data? This cannot be undone!')) return;
-                const token = localStorage.getItem('admin_token');
-                fetch(API + '/admin/customers/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } }).then(() => navigate('/customers'));
-              }}>Delete Customer</Button>
-            </CardContent>
-          </Card>
-        </Grid>
-              </Grid>
         <Grid item xs={12}>
           <Card><CardContent>
             <Button variant="contained" color="error" onClick={() => {
