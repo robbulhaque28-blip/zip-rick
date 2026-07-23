@@ -269,10 +269,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       if (status == 'completed') _btn('Done', Icons.home, const Color(0xFF4CAF50), () => setState(() { _hasActiveRide = false; _activeRide = null; })),
       const SizedBox(height: 12),
       Row(children: [
-        Expanded(child: SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _openChat, icon: const Icon(Icons.chat_rounded), label: const Text('Chat'), style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))))),
+        Expanded(child: OutlinedButton.icon(onPressed: _openChat, icon: const Icon(Icons.chat_rounded), label: const Text('Chat'), style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
         const SizedBox(width: 8),
-        Expanded(child: SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _callCustomer, icon: const Icon(Icons.phone), label: const Text('Call Customer'),
-        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
+        Expanded(child: OutlinedButton.icon(onPressed: _callCustomer, icon: const Icon(Icons.phone), label: const Text('Call'), style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
       ]),
   }
 
