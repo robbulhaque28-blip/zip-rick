@@ -28,6 +28,7 @@ class _HomePageState extends State<HomePage> {
   String _rideMode = 'single';
   DateTime? _scheduledTime;
   List<Map<String, dynamic>> _savedPlaces = [];
+  bool _bookingInProgress = false;
 
   @override
   void initState() { super.initState(); _loadSavedPlaces(); _getLocation(); }
