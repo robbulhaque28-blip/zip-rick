@@ -291,10 +291,49 @@ if (_driverLatLng != null) Marker(point: _driverLatLng!, width: 60, height: 60,
     );
   }
 
+  Future<void> _showOtpDialog() async {
+    final ctrl = TextEditingController();
+    String err = '';
+    await showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setD) => AlertDialog(
+      title: const Text('Enter Ride OTP'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('Ask your driver for the 4-digit code shown on their screen.', style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF))),
+        const SizedBox(height: 16),
+        TextField(controller: ctrl, keyboardType: TextInputType.number, maxLength: 4, textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
+          decoration: const InputDecoration(counterText: '', border: OutlineInputBorder())),
+        if (err.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(err, style: const TextStyle(color: Colors.red, fontSize: 13))),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+        ElevatedButton(onPressed: () async {
+          if (ctrl.text.trim().length != 4) { setD(() => err = 'Enter all 4 digits'); return; }
+          try {
+            final r = await _api.post('/rides/' + widget.rideData['id'].toString() + '/verify-otp', {'otp': ctrl.text.trim()});
+            if (r['success'] == true) {
+              Navigator.pop(ctx);
+              setState(() => _status = 'started');
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ride started!')));
+            } else {
+              setD(() => err = r['error']?['message'] ?? 'Invalid OTP');
+            }
+          } catch (e) { setD(() => err = 'Network error, try again'); }
+        }, child: const Text('Verify')),
+      ],
+    )));
+  }
+
   Widget _buildActionButton() {
     if (_status == 'completed') {
       return SizedBox(width: double.infinity, height: 48, child: ElevatedButton(onPressed: () => setState(() => _rideCompleted = true),
         style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4CAF50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text("Rate Your Ride")));
+    }
+    if (_status == 'driver_arrived') {
+      return SizedBox(width: double.infinity, height: 48, child: ElevatedButton.icon(
+        onPressed: _showOtpDialog,
+        icon: const Icon(Icons.lock_open),
+        label: const Text('Enter OTP to Start'),
+        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4CAF50), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))));
     }
     if (_status == 'started') {
       return SizedBox(width: double.infinity, height: 48, child: ElevatedButton(onPressed: () {},

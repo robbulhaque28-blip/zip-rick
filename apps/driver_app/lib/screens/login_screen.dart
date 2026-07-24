@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/firebase_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -29,6 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
         final d = res['data'];
         if (d != null && d['tokens'] != null && d['tokens']['accessToken'] != null) {
           await ApiService.saveToken(d['tokens']['accessToken']);
+          await FirebaseService.registerTokenAfterLogin();
           if (mounted) Navigator.pushReplacementNamed(context, '/register-docs');
         } else { setState(() { _errorMsg = 'Registration failed'; _loading = false; }); }
       } else {
@@ -37,6 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
           final d = res['data'];
           if (d != null && d['tokens'] != null && d['tokens']['accessToken'] != null) {
             await ApiService.saveToken(d['tokens']['accessToken']);
+            await FirebaseService.registerTokenAfterLogin();
             if (mounted) Navigator.pushReplacementNamed(context, '/home');
           } else { setState(() { _errorMsg = 'Account not found. Register?'; _loading = false; }); }
         } catch (_) { setState(() { _errorMsg = 'Account not found. Register?'; _loading = false; }); }
@@ -48,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
     padding: const EdgeInsets.all(24),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const SizedBox(height: 30),
-      Container(width: 80, height: 80, decoration: BoxDecoration(color: Color(0xFF6C63FF).withOpacity(0.1), borderRadius: BorderRadius.circular(20)), child: ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.asset('assets/icon_square.png', width: 64, height: 64, fit: BoxFit.contain, alignment: Alignment.center))),
+      Container(width: 80, height: 80, decoration: BoxDecoration(color: Color(0xFF6C63FF).withOpacity(0.1), shape: BoxShape.circle), child: const Icon(Icons.electric_rickshaw_rounded, size: 40, color: Color(0xFF6C63FF))),
       const SizedBox(height: 24),
       if (!_showOtp) Container(
         decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),

@@ -129,4 +129,13 @@ class ApiService {
     final res = await http.post(Uri.parse(baseUrl + '/rides/' + rideId + '/rate'), headers: await _headers(), body: jsonEncode({'rating': rating}));
     return jsonDecode(res.body);
   }
+
+  Future<Map<String, dynamic>> updateFCMToken(String token) async {
+    final res = await http.post(Uri.parse(baseUrl + '/auth/update-fcm'), headers: await _headers(), body: jsonEncode({'fcm_token': token}));
+    return jsonDecode(res.body);
+  }
+  Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body) async {
+    final res = await http.post(Uri.parse(baseUrl + path), headers: await _headers(), body: jsonEncode(body));
+    return jsonDecode(res.body);
+  }
 }

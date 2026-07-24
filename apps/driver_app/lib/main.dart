@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'services/firebase_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_docs_screen.dart';
@@ -16,7 +17,11 @@ class AppColors {
   static const textDark = Color(0xFF1F2937);
 }
 
-void main() { WidgetsFlutterBinding.ensureInitialized(); runApp(const VybeDriverApp()); }
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try { await FirebaseService.initialize(); } catch (e) { print('Firebase init error: $e'); }
+  runApp(const VybeDriverApp());
+}
 
 class VybeDriverApp extends StatelessWidget {
   const VybeDriverApp({super.key});

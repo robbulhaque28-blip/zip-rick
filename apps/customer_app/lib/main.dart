@@ -1,6 +1,7 @@
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "services/api_service.dart";
+import "services/firebase_service.dart";
 import "screens/splash_screen.dart";
 import "screens/welcome_screen.dart";
 import "screens/login_screen.dart";
@@ -8,9 +9,14 @@ import "screens/register_screen.dart";
 import "screens/main_screen.dart";
 import "screens/support_page.dart";
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(statusBarColor: Colors.transparent));
+  try {
+    await FirebaseService.initialize();
+  } catch (e) {
+    print('Firebase init error (non-fatal): $e');
+  }
   runApp(const VybeApp());
 }
 

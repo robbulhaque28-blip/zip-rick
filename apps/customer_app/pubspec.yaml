@@ -20,6 +20,8 @@ dependencies:
   intl: ^0.18.1
   flutter_rating_bar: ^4.0.1
   url_launcher: ^6.2.1
+  firebase_core: ^2.24.2
+  firebase_messaging: ^14.7.10
 
 dev_dependencies:
   flutter_test:
@@ -28,5 +30,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/icon_square.png

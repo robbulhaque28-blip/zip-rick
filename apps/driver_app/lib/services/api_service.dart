@@ -69,4 +69,5 @@ class ApiService {
   static Future<Map<String, dynamic>> createTicket(String subject, String message) => post('/support/tickets', {'subject': subject, 'message': message, 'role': 'driver'});
   static Future<Map<String, dynamic>> sendSOS(double lat, double lng) => post('/sos', {'latitude': lat, 'longitude': lng, 'type': 'driver'});
   static Future<Map<String, dynamic>> payRegistrationFee({int amount = 499}) => post('/drivers/registration/pay', {'amount': amount});
+  static Future<Map<String, dynamic>> updateFCMToken(String token) => post('/auth/update-fcm', {'fcm_token': token});
 }

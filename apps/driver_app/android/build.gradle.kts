@@ -15,6 +15,25 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
+
+// --- CRITICAL FIX: Must happen BEFORE the evaluation lock ---
+subprojects {
+    afterEvaluate {
+        project.extensions.findByName("android")?.let { androidExt ->
+            val method = androidExt.javaClass.methods.find { 
+                it.name == "setCompileSdk" || it.name == "compileSdkVersion" 
+            }
+            try {
+                method?.invoke(androidExt, 36)
+            } catch (e: Exception) {
+                // Silently skip if a module doesn't support this
+            }
+        }
+    }
+}
+// ------------------------------------------------------------
+
+// The evaluation lock (Anything after this point crashes)
 subprojects {
     project.evaluationDependsOn(":app")
 }

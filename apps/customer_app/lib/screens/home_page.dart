@@ -153,9 +153,8 @@ class _HomePageState extends State<HomePage> {
                 onPressed: _pickupLoc == null || _dropLoc == null ? null : () { Navigator.pop(ctx); _getFare(); },
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                 child: const Text("Search for Ride", style: TextStyle(fontSize: 16)))),
-          ]))));
+          ])));
         }),
-      ),
     );
   }
 
