@@ -10,4 +10,5 @@ router.get('/searching/available', authorize('driver'), ctrl.getSearchingRides);
 router.get('/:id', ctrl.getRideDetails);
 router.post('/:id/cancel', ctrl.cancelRide);
 router.post('/:id/rate', ctrl.rateRide);
+router.post('/:id/verify-otp', ctrl.verifyOtp);
 module.exports = router;
