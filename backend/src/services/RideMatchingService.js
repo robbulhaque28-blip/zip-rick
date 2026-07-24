@@ -1,6 +1,6 @@
-const { Op } = require('sequelize');
 const { Driver, Ride, RideStatusLog } = require('../models');
 const { getIO } = require('../sockets');
+const { sendPushNotification } = require('./FirebaseService');
 const logger = require('../utils/logger');
 
 class RideMatchingService {
@@ -30,7 +30,6 @@ class RideMatchingService {
       const dLng = (parseFloat(d.current_longitude) - lng) * Math.PI / 180;
       const a = Math.sin(dLat/2)**2 + Math.cos(lat*Math.PI/180) * Math.cos(parseFloat(d.current_latitude)*Math.PI/180) * Math.sin(dLng/2)**2;
       const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      // Check destination filter
     if (d.destination_latitude && d.destination_longitude && d.destination_radius_km) {
       const destDist = _calcDistKm(parseFloat(d.current_latitude), parseFloat(d.current_longitude), 
                                      parseFloat(d.destination_latitude), parseFloat(d.destination_longitude));
@@ -76,7 +75,6 @@ class RideMatchingService {
       }
     });
 
-    // Emit socket event to each nearby driver
     const io = getIO();
     if (io) {
       for (const entry of nearby) {
@@ -104,9 +102,7 @@ class RideMatchingService {
       }
     }
 
-    // Set 60-second timeout: if no driver accepts, mark as no_driver_found
     const tid = setTimeout(async () => {
-      // Re-check ride status — maybe a driver already accepted
       const currentRide = await Ride.findByPk(ride.id);
       if (currentRide && currentRide.status === 'searching') {
         currentRide.status = 'no_driver_found';
@@ -143,7 +139,6 @@ class RideMatchingService {
       { where: { id: driverId } }
     );
     
-    // Notify all other nearby drivers that this ride is taken
     const io = getIO();
     if (io) {
       const search = this.activeSearches.get(rideId);
@@ -154,7 +149,6 @@ class RideMatchingService {
           }
         }
       }
-      // Notify customer via their user_id
       const customer = await ride.getCustomer({ include: [{ association: 'user', attributes: ['id'] }] });
       const customerUserId = customer?.user?.id;
       const driver = await Driver.findByPk(driverId, {
@@ -177,6 +171,22 @@ class RideMatchingService {
     }
     
     this._cleanup(rideId);
+    
+    // Push notifications
+    const driver = await Driver.findByPk(driverId, {
+      include: [{ association: 'user', attributes: ['id', 'full_name'] }]
+    });
+    const customer = await ride.getCustomer({ include: [{ association: 'user', attributes: ['id'] }] });
+    const customerUserId = customer?.user?.id;
+    if (customerUserId && driver) {
+      await sendPushNotification(customerUserId, '🚖 Driver Assigned', 
+        `Your driver ${driver.user?.full_name || 'Driver'} is on the way!`, 
+        { ride_id: ride.id.toString(), type: 'ride_accepted' });
+      await sendPushNotification(driver.user.id, '🚖 New Ride Assigned', 
+        `Pickup: ${ride.pickup_address}`, 
+        { ride_id: ride.id.toString(), type: 'ride_assigned' });
+    }
+    
     logger.info(`Driver ${driverId} accepted ride ${ride.ride_number}`);
     return ride;
   }

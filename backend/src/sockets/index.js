@@ -8,11 +8,12 @@ const jwt = require('jsonwebtoken');
 const config = require('../config');
 const { User, Driver, Customer, Ride, ChatMessage } = require('../models');
 const RideMatchingService = require('../services/RideMatchingService');
+const { sendPushNotification } = require('../services/FirebaseService');
 const logger = require('../utils/logger');
 
 let io = null;
-const userSockets = new Map(); // userId -> Set of socketIds
-const socketUsers = new Map(); // socketId -> { userId, role }
+const userSockets = new Map();
+const socketUsers = new Map();
 
 function setupSocketIO(server) {
   io = new Server(server, {
@@ -26,7 +27,6 @@ function setupSocketIO(server) {
     transports: ['websocket', 'polling'],
   });
 
-  // Authentication middleware
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token || socket.handshake.query?.token;
@@ -54,7 +54,6 @@ function setupSocketIO(server) {
   io.on('connection', (socket) => {
     const { userId, userRole } = socket;
 
-    // Track user sockets
     if (!userSockets.has(userId)) {
       userSockets.set(userId, new Set());
     }
@@ -63,13 +62,10 @@ function setupSocketIO(server) {
 
     logger.info(`Socket connected: user=${userId} role=${userRole} socket=${socket.id}`);
 
-    // Join user-specific room
     socket.join(`user:${userId}`);
     socket.join(`role:${userRole}`);
 
-    // ============================
     // Driver: Location Updates
-    // ============================
     socket.on('driver:location_update', async (data) => {
       if (userRole !== 'driver') return;
 
@@ -80,19 +76,16 @@ function setupSocketIO(server) {
           { where: { user_id: userId } }
         );
 
-        // Get driver info
         const driver = await Driver.findOne({
           where: { user_id: userId },
           attributes: ['id', 'current_latitude', 'current_longitude', 'current_ride_id'],
         });
 
         if (driver && driver.current_ride_id) {
-          // Get ride to find customer
           const ride = await Ride.findByPk(driver.current_ride_id, {
             attributes: ['id', 'customer_id'],
           });
           if (ride) {
-            // Emit to customer
             io.to(`user:${ride.customer_id}`).emit('ride:driver_location', {
               ride_id: ride.id,
               driver_id: driver.id,
@@ -103,7 +96,6 @@ function setupSocketIO(server) {
           }
         }
 
-        // Broadcast to nearby customers looking for rides (optional)
         socket.broadcast.emit('driver:available', {
           driver_id: driver?.id,
           latitude,
@@ -114,9 +106,7 @@ function setupSocketIO(server) {
       }
     });
 
-    // ============================
     // Driver: Go Online/Offline
-    // ============================
     socket.on('driver:go_online', async () => {
       if (userRole !== 'driver') return;
       await Driver.update({ is_online: true, is_available: true }, { where: { user_id: userId } });
@@ -129,14 +119,6 @@ function setupSocketIO(server) {
       await Driver.update({ is_online: false, is_available: false }, { where: { user_id: userId } });
       socket.emit('driver:status_changed', { is_online: false, is_available: false });
       logger.info(`Driver ${userId} went offline`);
-    });
-
-    // ============================
-    // Ride Matching: Request to Driver
-    // ============================
-    socket.on('ride:request_driver', async (data) => {
-      if (userRole !== 'driver') return;
-      // The server sends ride requests via 'ride:new_request' event
     });
 
     // Driver accepts ride
@@ -154,7 +136,6 @@ function setupSocketIO(server) {
       try {
         const ride = await RideMatchingService.handleDriverAccept(ride_id, driver.id);
         if (ride) {
-          // Notify customer
           io.to(`user:${ride.customer_id}`).emit('ride:accepted', {
             ride_id: ride.id,
             driver: {
@@ -182,15 +163,11 @@ function setupSocketIO(server) {
       const { ride_id } = data;
       const result = await RideMatchingService.handleDriverReject(ride_id, null);
       if (result) {
-        // Send request to next driver via their socket
         const { driver } = result;
-        // This is handled by the matching service finding next driver
       }
     });
 
-    // ============================
     // Ride Status Updates (Driver)
-    // ============================
     socket.on('ride:arrived', async (data) => {
       if (userRole !== 'driver') return;
       const { ride_id } = data;
@@ -208,6 +185,9 @@ function setupSocketIO(server) {
 
         io.to(`user:${ride.customer_id}`).emit('ride:driver_arrived', { ride_id });
         socket.emit('ride:status_updated', { ride_id, status: 'driver_arrived' });
+        
+        // Push
+        try { const c = await ride.getCustomer({ include: [{ association: 'user', attributes: ['id'] }] }); if (c?.user?.id) await sendPushNotification(c.user.id, '🚖 Driver Arrived', 'Your driver has arrived at the pickup location!', { ride_id: ride.id.toString(), type: 'driver_arrived' }); } catch(e) {}
       }
     });
 
@@ -228,6 +208,9 @@ function setupSocketIO(server) {
 
         io.to(`user:${ride.customer_id}`).emit('ride:started', { ride_id });
         socket.emit('ride:status_updated', { ride_id, status: 'started' });
+        
+        // Push
+        try { const c = await ride.getCustomer({ include: [{ association: 'user', attributes: ['id'] }] }); if (c?.user?.id) await sendPushNotification(c.user.id, '🚖 Ride Started', 'Your ride has started! Enjoy the trip.', { ride_id: ride.id.toString(), type: 'ride_started' }); } catch(e) {}
       }
     });
 
@@ -246,7 +229,6 @@ function setupSocketIO(server) {
           changed_by: 'driver', changed_by_id: userId,
         });
 
-        // Free up driver
         await Driver.update(
           { is_available: true, current_ride_id: null },
           { where: { id: ride.driver_id } }
@@ -258,19 +240,20 @@ function setupSocketIO(server) {
           payment_method: ride.payment_method,
         });
         socket.emit('ride:status_updated', { ride_id, status: 'completed' });
+        
+        // Push
+        try { const c = await ride.getCustomer({ include: [{ association: 'user', attributes: ['id'] }] }); if (c?.user?.id) await sendPushNotification(c.user.id, '✅ Ride Complete', 'Your ride is complete! Fare: ₹' + ride.total_fare, { ride_id: ride.id.toString(), type: 'ride_completed' }); } catch(e) {}
+        try { const d = await ride.getDriver({ include: [{ association: 'user', attributes: ['id'] }] }); if (d?.user?.id) await sendPushNotification(d.user.id, '✅ Ride Complete', 'Ride completed! You earned ₹' + ride.driver_earnings, { ride_id: ride.id.toString(), type: 'ride_completed' }); } catch(e) {}
       }
     });
 
-    // ============================
     // Chat: Driver-Customer
-    // ============================
     socket.on('chat:send', async (data) => {
       const { ride_id, message, message_type = 'text' } = data;
       try {
         const ride = await Ride.findByPk(ride_id);
         if (!ride) return;
 
-        // Verify user is part of this ride
         const customer = await Customer.findOne({ where: { user_id: userId } });
         const driver = await Driver.findOne({ where: { user_id: userId } });
         const isParticipant =
@@ -287,7 +270,6 @@ function setupSocketIO(server) {
           message_type,
         });
 
-        // Broadcast to other participant
         const otherUserId =
           userRole === 'customer'
             ? await _getDriverUserId(ride.driver_id)
@@ -325,9 +307,7 @@ function setupSocketIO(server) {
       );
     });
 
-    // ============================
     // Disconnect
-    // ============================
     socket.on('disconnect', () => {
       logger.info(`Socket disconnected: user=${userId} socket=${socket.id}`);
 
@@ -336,7 +316,6 @@ function setupSocketIO(server) {
         userSocketSet.delete(socket.id);
         if (userSocketSet.size === 0) {
           userSockets.delete(userId);
-          // Mark driver offline if all sockets disconnected
           if (userRole === 'driver') {
             Driver.update({ is_online: false }, { where: { user_id: userId } }).catch(() => {});
           }
@@ -346,9 +325,7 @@ function setupSocketIO(server) {
     });
   });
 
-  // Store io instance for use in routes
   io._instance = io;
-
   logger.info('Socket.IO initialized');
   return io;
 }
@@ -365,25 +342,16 @@ async function _getCustomerUserId(customerId) {
   return customer?.user_id;
 }
 
-/**
- * Get Socket.IO instance
- */
 function getIO() {
   return io;
 }
 
-/**
- * Emit event to a specific user
- */
 function emitToUser(userId, event, data) {
   if (io) {
     io.to(`user:${userId}`).emit(event, data);
   }
 }
 
-/**
- * Emit event to all users with a specific role
- */
 function emitToRole(role, event, data) {
   if (io) {
     io.to(`role:${role}`).emit(event, data);
