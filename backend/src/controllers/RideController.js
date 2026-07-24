@@ -235,6 +235,25 @@ module.exports = {
     }
     return success(res, { ride }, 'Ride cancelled');
   }),
+    }),
+  verifyOtp: asyncHandler(async (req, res) => {
+    const ride = await Ride.findByPk(req.params.id);
+    if (!ride) throw new ApiError(404, 'Ride not found');
+    if (!['driver_arrived'].includes(ride.status)) throw new ApiError(400, 'Cannot verify OTP at this stage');
+    if (ride.ride_otp !== req.body.otp) throw new ApiError(400, 'Invalid OTP');
+    ride.status = 'started';
+    ride.ride_started_at = new Date();
+    await ride.save();
+    await RideStatusLog.create({ ride_id: ride.id, previous_status: 'driver_arrived', new_status: 'started', changed_by: 'customer', changed_by_id: req.userId });
+    const { getIO } = require('../sockets');
+    const io = getIO();
+    if (io) {
+      io.to('user:' + req.userId).emit('ride:started', { ride_id: ride.id });
+      const driver = await require('../models').Driver.findByPk(ride.driver_id);
+      if (driver) io.to('user:' + driver.user_id).emit('ride:status_updated', { ride_id: ride.id, status: 'started' });
+    }
+    return success(res, { ride }, 'OTP verified, ride started');
+  }),
   rateRide: asyncHandler(async (req, res) => {
     const ride = await Ride.findByPk(req.params.id);
     if (!ride) throw new ApiError(404, 'Ride not found');
