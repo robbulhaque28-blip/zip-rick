@@ -135,6 +135,10 @@ function setupSocketIO(server) {
 
       try {
         const ride = await RideMatchingService.handleDriverAccept(ride_id, driver.id);
+        if (!ride) {
+          socket.emit('ride:accept_error', { message: 'This ride is no longer available' });
+          return;
+        }
         if (ride) {
           io.to(`user:${ride.customer_id}`).emit('ride:accepted', {
             ride_id: ride.id,
@@ -153,7 +157,7 @@ function setupSocketIO(server) {
         }
       } catch (error) {
         logger.error('Ride accept error:', error);
-        socket.emit('ride:accept_error', { message: 'Failed to accept ride' });
+        socket.emit('ride:accept_error', { message: 'Failed to accept ride: ' + (error.message || 'unknown error') });
       }
     });
 

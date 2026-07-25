@@ -173,7 +173,8 @@ class RideMatchingService {
     
     this._cleanup(rideId);
     
-    // Push notifications
+    // Push notifications - must never block ride acceptance
+    try {
     const driver = await Driver.findByPk(driverId, {
       include: [{ association: 'user', attributes: ['id', 'full_name'] }]
     });
@@ -183,11 +184,13 @@ class RideMatchingService {
       await sendPushNotification(customerUserId, '🚖 Driver Assigned', 
         `Your driver ${driver.user?.full_name || 'Driver'} is on the way!`, 
         { ride_id: ride.id.toString(), type: 'ride_accepted' });
-      await sendPushNotification(driver.user.id, '🚖 New Ride Assigned', 
+      if (driver.user?.id) await sendPushNotification(driver.user.id, '🚖 New Ride Assigned', 
         `Pickup: ${ride.pickup_address}`, 
         { ride_id: ride.id.toString(), type: 'ride_assigned' });
     }
     
+    } catch (e) { logger.error('Push notification failed (non-fatal): ' + e.message); }
+
     logger.info(`Driver ${driverId} accepted ride ${ride.ride_number}`);
     return ride;
   }
