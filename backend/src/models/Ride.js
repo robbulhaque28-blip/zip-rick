@@ -59,7 +59,7 @@ Ride.init({
   modelName: 'Ride',
   tableName: 'rides',
   hooks: {
-    beforeCreate: (ride) => {
+    beforeValidate: (ride) => {
       if (!ride.ride_number) {
         ride.ride_number = Ride.generateRideNumber();
         console.log('Generated ride number:', ride.ride_number);
