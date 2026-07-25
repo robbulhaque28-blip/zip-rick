@@ -188,8 +188,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showPayment(int amount, Map<String, dynamic>? fare) {
-    showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => StatefulBuilder(builder: (ctx, setModal) => Container(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+    showModalBottomSheet(context: context, isScrollControlled: true, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setModal) => SingleChildScrollView(padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom), child: Container(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
         Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
         const SizedBox(height: 16),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text("Your Trip", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx), visualDensity: VisualDensity.compact)]),
@@ -247,12 +248,12 @@ class _HomePageState extends State<HomePage> {
         Row(children: [
           Expanded(child: TextField(controller: _promoCtrl, decoration: InputDecoration(labelText: "Promo", border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14)))),
           const SizedBox(width: 8),
-          ElevatedButton(onPressed: () {
+          SizedBox(width: 100, height: 48, child: ElevatedButton(onPressed: () {
             final code = _promoCtrl.text.trim().toUpperCase();
             if (code == "ZIP50") { setModal(() { _discount = (amount * 0.5).toInt(); _appliedPromo = code; }); }
             else if (code == "ZIP20") { setModal(() { _discount = 20; _appliedPromo = code; }); }
             else { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Invalid code"))); }
-          }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14)), child: const Text("Apply")),
+          }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), minimumSize: const Size(0, 0), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(horizontal: 12)), child: const Text("Apply"))),
         ]),
         const SizedBox(height: 20),
         Row(children: [
@@ -260,7 +261,7 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(width: 12),
           Expanded(child: SizedBox(height: 52, child: ElevatedButton(onPressed: () { Navigator.pop(ctx); _bookRide("upi"); }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text("UPI")))),
         ]),
-      ]))));
+      ])))));
   }
 
   Widget _fr(String l, String v, {bool bold = false, Color? color}) => Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
