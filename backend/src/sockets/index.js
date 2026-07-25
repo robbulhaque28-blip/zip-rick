@@ -7,7 +7,6 @@ const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const { User, Driver, Customer, Ride, ChatMessage } = require('../models');
-const RideMatchingService = require('../services/RideMatchingService');
 const { sendPushNotification } = require('../services/FirebaseService');
 const logger = require('../utils/logger');
 
@@ -134,6 +133,7 @@ function setupSocketIO(server) {
       }
 
       try {
+        const RideMatchingService = require('../services/RideMatchingService');
         const ride = await RideMatchingService.handleDriverAccept(ride_id, driver.id);
         if (!ride) {
           socket.emit('ride:accept_error', { message: 'This ride is no longer available' });
@@ -165,10 +165,8 @@ function setupSocketIO(server) {
     socket.on('ride:reject', async (data) => {
       if (userRole !== 'driver') return;
       const { ride_id } = data;
-      const result = await RideMatchingService.handleDriverReject(ride_id, null);
-      if (result) {
-        const { driver } = result;
-      }
+      logger.info(`Driver ${userId} declined ride ${ride_id}`);
+      socket.emit('ride:reject_ack', { ride_id });
     });
 
     // Ride Status Updates (Driver)
