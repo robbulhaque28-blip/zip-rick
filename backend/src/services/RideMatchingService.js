@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const { Driver, Ride, RideStatusLog } = require('../models');
 const { getIO } = require('../sockets');
 const { sendPushNotification } = require('./FirebaseService');
