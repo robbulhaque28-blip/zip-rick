@@ -55,24 +55,61 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _getLocation() async {
     try {
-      if (await Geolocator.requestPermission() == LocationPermission.whileInUse || await Geolocator.checkPermission() == LocationPermission.always) {
-        final lastPos = await Geolocator.getLastKnownPosition();
-        if (lastPos != null && !_locationDone && mounted) {
-          final ll = LatLng(lastPos.latitude, lastPos.longitude);
-          setState(() { _currentLoc = ll; _pickupLoc = ll; _pickupCtrl.text = "Current Location"; _loading = false; _locationDone = true; });
-          _mapCtrl.move(ll, 15);
-        }
-        final precisePos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      if (!await Geolocator.isLocationServiceEnabled()) {
         if (mounted) {
-          final ll = LatLng(precisePos.latitude, precisePos.longitude);
-          setState(() { _currentLoc = ll; _pickupLoc = ll; _pickupCtrl.text = "Current Location"; _loading = false; _locationDone = true; });
-          _mapCtrl.move(ll, 15);
+          setState(() => _loading = false);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Location is turned off. Please enable GPS."), duration: Duration(seconds: 5)));
         }
-      } else {
-        if (mounted) setState(() => _loading = false);
+        return;
       }
-    } catch (_) {
-      if (!_locationDone && mounted) setState(() => _loading = false);
+
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
+      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() => _loading = false);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Location permission denied. Enable it in Settings to set your pickup."), duration: Duration(seconds: 5)));
+        }
+        return;
+      }
+
+      // Only trust a cached fix if it is reasonably accurate, and use it purely
+      // to give the map something to show while real GPS warms up. It never
+      // becomes the pickup point on its own.
+      final lastPos = await Geolocator.getLastKnownPosition();
+      if (lastPos != null && !_locationDone && mounted) {
+        if (lastPos.accuracy <= 100) {
+          final ll = LatLng(lastPos.latitude, lastPos.longitude);
+          setState(() { _currentLoc = ll; _loading = false; });
+          _mapCtrl.move(ll, 16);
+        }
+      }
+
+      // Real GPS fix - this is the only one we trust for pickup.
+      final precisePos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 25),
+      );
+      if (!mounted) return;
+      final ll = LatLng(precisePos.latitude, precisePos.longitude);
+      setState(() {
+        _currentLoc = ll;
+        _pickupLoc = ll;
+        _pickupCtrl.text = "Current Location";
+        _loading = false;
+        _locationDone = true;
+      });
+      _mapCtrl.move(ll, 16);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      if (!_locationDone) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("Could not get an accurate GPS fix. Move to an open area, or long-press the map to set pickup."),
+          duration: Duration(seconds: 5)));
+      }
     }
   }
 
@@ -315,7 +352,7 @@ class _HomePageState extends State<HomePage> {
                 Text(_rideMode == 'sharing' ? "Shared ride" : "Private ride", style: AppText.label),
               ])),
               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text("₹${amount - _discount}", style: AppText.h1.copyWith(fontSize: 26)),
+                Text("₹${amount - _discount}", style: AppText.h1.copyWith(fontSize: 23)),
                 if (_discount > 0) Text("₹$amount", style: AppText.label.copyWith(fontSize: 12, decoration: TextDecoration.lineThrough)),
               ]),
             ]),
@@ -528,7 +565,7 @@ class _HomePageState extends State<HomePage> {
 
       // My location button
       Positioned(right: 16, bottom: 106, child: GestureDetector(
-        onTap: _getLocation,
+        onTap: () { _locationDone = false; _getLocation(); },
         child: Container(
           width: 44, height: 44,
           decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), boxShadow: AppShadow.card),

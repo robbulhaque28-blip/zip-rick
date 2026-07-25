@@ -49,7 +49,9 @@ module.exports = {
     if (!customer) throw new ApiError(404, 'Customer not found');
     const route = await getRoute(req.body.pickup_latitude, req.body.pickup_longitude, req.body.drop_latitude, req.body.drop_longitude);
     const rideMode = req.body.ride_mode || 'single';
-    const fare = await FareService.calculateFare({ distanceMeters: req.body.route_distance || route.distance_meters, durationSeconds: req.body.route_duration || route.duration_seconds, ride_mode: rideMode });
+    // Always use the server-calculated route. Trusting req.body.route_distance
+    // let the app send a hardcoded 5000m, so the booked fare did not match the estimate.
+    const fare = await FareService.calculateFare({ distanceMeters: route.distance_meters, durationSeconds: route.duration_seconds, ride_mode: rideMode });
     let promoDiscount = 0, promoCodeId = null;
     if (req.body.promo_code) { const p = await FareService.applyPromo(fare.total_fare, req.body.promo_code); promoDiscount = p.discount; promoCodeId = p.promo_code_id; }
     const totalFare = parseFloat((fare.total_fare - promoDiscount).toFixed(2));
@@ -65,8 +67,8 @@ module.exports = {
       drop_longitude: req.body.drop_longitude,
       drop_address: req.body.drop_address,
       drop_place_id: req.body.drop_place_id,
-      route_distance: req.body.route_distance || route.distance_meters,
-      route_duration: req.body.route_duration || route.duration_seconds,
+      route_distance: route.distance_meters,
+      route_duration: route.duration_seconds,
       route_polyline: req.body.route_polyline || route.polyline,
       base_fare: fare.base_fare,
       distance_fare: fare.distance_fare,
@@ -259,19 +261,30 @@ module.exports = {
   verifyOtp: asyncHandler(async (req, res) => {
     const ride = await Ride.findByPk(req.params.id);
     if (!ride) throw new ApiError(404, 'Ride not found');
-    if (!['driver_arrived'].includes(ride.status)) throw new ApiError(400, 'Cannot verify OTP at this stage');
-    if (ride.ride_otp !== req.body.otp) throw new ApiError(400, 'Invalid OTP');
+    if (ride.status !== 'driver_arrived') throw new ApiError(400, 'Driver has not arrived yet');
+
+    // The driver submits the OTP that the customer reads out to them.
+    const driver = await Driver.findOne({ where: { user_id: req.userId } });
+    if (!driver || ride.driver_id !== driver.id) throw new ApiError(403, 'Not your ride');
+
+    const otp = String(req.body.otp || '').trim();
+    if (!ride.ride_otp || otp !== ride.ride_otp) throw new ApiError(400, 'Invalid OTP');
+
     ride.status = 'started';
     ride.ride_started_at = new Date();
     await ride.save();
-    await RideStatusLog.create({ ride_id: ride.id, previous_status: 'driver_arrived', new_status: 'started', changed_by: 'customer', changed_by_id: req.userId });
-    const { getIO } = require('../sockets');
-    const io = getIO();
-    if (io) {
-      io.to('user:' + req.userId).emit('ride:started', { ride_id: ride.id });
-      const driver = await require('../models').Driver.findByPk(ride.driver_id);
-      if (driver) io.to('user:' + driver.user_id).emit('ride:status_updated', { ride_id: ride.id, status: 'started' });
-    }
+    await RideStatusLog.create({ ride_id: ride.id, previous_status: 'driver_arrived', new_status: 'started', changed_by: 'driver', changed_by_id: req.userId });
+
+    try {
+      const { getIO } = require('../sockets');
+      const io = getIO();
+      if (io) {
+        const customer = await ride.getCustomer({ include: [{ association: 'user', attributes: ['id'] }] });
+        if (customer?.user?.id) io.to('user:' + customer.user.id).emit('ride:started', { ride_id: ride.id });
+        io.to('user:' + req.userId).emit('ride:status_updated', { ride_id: ride.id, status: 'started' });
+      }
+    } catch (e) { logger.error('verifyOtp socket emit failed: ' + e.message); }
+
     return success(res, { ride }, 'OTP verified, ride started');
   }),
   rateRide: asyncHandler(async (req, res) => {

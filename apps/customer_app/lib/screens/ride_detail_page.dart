@@ -88,7 +88,7 @@ class _RideDetailPageState extends State<RideDetailPage> {
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('TOTAL FARE', style: AppText.tiny),
                   const SizedBox(height: 4),
-                  Text('₹$fare', style: AppText.h1.copyWith(fontSize: 27)),
+                  Text('₹$fare', style: AppText.h1.copyWith(fontSize: 24)),
                 ])),
                 VybeBadge(text: status.replaceAll('_', ' '), color: _statusColor(status)),
               ]),

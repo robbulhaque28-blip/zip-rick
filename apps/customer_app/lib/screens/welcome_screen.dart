@@ -17,7 +17,7 @@ class WelcomeScreen extends StatelessWidget {
           child: const Icon(Icons.electric_rickshaw_rounded, size: 38, color: Colors.white),
         ),
         const SizedBox(height: 28),
-        Text("Get moving\nwith Vybe", style: AppText.h1.copyWith(fontSize: 33, height: 1.22)),
+        Text("Get moving\nwith Vybe", style: AppText.h1.copyWith(fontSize: 29, height: 1.25)),
         const SizedBox(height: 12),
         Text(
           "Book an e-rickshaw in seconds. Fair fares,\nverified drivers, live tracking.",

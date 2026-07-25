@@ -39,7 +39,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             child: const Icon(Icons.electric_rickshaw_rounded, size: 46, color: Colors.white),
           ),
           const SizedBox(height: 22),
-          Text("Vybe", style: AppText.h1.copyWith(color: Colors.white, fontSize: 34)),
+          Text("Vybe", style: AppText.h1.copyWith(color: Colors.white, fontSize: 30)),
           const SizedBox(height: 6),
           Text("Your E-Rickshaw, Instantly", style: AppText.body.copyWith(color: Colors.white.withOpacity(0.72))),
           const SizedBox(height: 52),

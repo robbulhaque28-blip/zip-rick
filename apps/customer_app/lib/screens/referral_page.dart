@@ -77,7 +77,7 @@ class _ReferralPageState extends State<ReferralPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
                 decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(AppRadius.md)),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text(_code ?? "—", style: AppText.h2.copyWith(color: Colors.white, letterSpacing: 3, fontSize: 22)),
+                  Text(_code ?? "—", style: AppText.h2.copyWith(color: Colors.white, letterSpacing: 2.5, fontSize: 20)),
                   const SizedBox(width: 11),
                   Icon(Icons.copy_rounded, size: 16, color: Colors.white.withOpacity(0.8)),
                 ]),

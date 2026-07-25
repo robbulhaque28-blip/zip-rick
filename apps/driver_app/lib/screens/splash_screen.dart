@@ -1,23 +1,46 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
   @override State<SplashScreen> createState() => _SplashScreenState();
 }
-class _SplashScreenState extends State<SplashScreen> {
+
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..forward();
+
   @override void initState() { super.initState(); _check(); }
+  @override void dispose() { _c.dispose(); super.dispose(); }
+
   Future<void> _check() async {
     await Future.delayed(const Duration(seconds: 2));
     final token = await ApiService.getToken();
     if (token != null && mounted) Navigator.pushReplacementNamed(context, '/home');
     else if (mounted) Navigator.pushReplacementNamed(context, '/login');
   }
-  @override Widget build(BuildContext context) => Scaffold(backgroundColor: const Color(0xFF6C63FF),
-    body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Container(width: 100, height: 100, decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
-        child: const Icon(Icons.electric_rickshaw_rounded, size: 50, color: Colors.white)),
-      const SizedBox(height: 24), const Text('Vybe Driver', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 60), const CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
-    ])));
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppColors.primary,
+    body: Center(child: FadeTransition(
+      opacity: CurvedAnimation(parent: _c, curve: Curves.easeOut),
+      child: ScaleTransition(
+        scale: Tween(begin: 0.88, end: 1.0).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutBack)),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Container(
+            width: 96, height: 96,
+            decoration: BoxDecoration(color: Colors.white.withOpacity(0.16), borderRadius: BorderRadius.circular(28)),
+            child: const Icon(Icons.electric_rickshaw_rounded, size: 46, color: Colors.white),
+          ),
+          const SizedBox(height: 22),
+          Text('Vybe Driver', style: AppText.h1.copyWith(color: Colors.white, fontSize: 27)),
+          const SizedBox(height: 6),
+          Text('Drive. Earn. Repeat.', style: AppText.body.copyWith(color: Colors.white.withOpacity(0.72))),
+          const SizedBox(height: 52),
+          SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white.withOpacity(0.85))),
+        ]),
+      ),
+    )),
+  );
 }

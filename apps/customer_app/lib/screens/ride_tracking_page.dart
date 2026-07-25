@@ -221,7 +221,7 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
         const SizedBox(height: 18),
         TextField(
           controller: ctrl, keyboardType: TextInputType.number, maxLength: 4, textAlign: TextAlign.center, autofocus: true,
-          style: AppText.h1.copyWith(letterSpacing: 12, fontSize: 26),
+          style: AppText.h1.copyWith(letterSpacing: 10, fontSize: 24),
           decoration: const InputDecoration(counterText: '', hintText: '····'),
         ),
         if (err.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10),
