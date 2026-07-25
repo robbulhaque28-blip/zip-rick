@@ -157,7 +157,11 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 12),
               SizedBox(width: double.infinity, height: 56, child: ElevatedButton(
-                onPressed: _pickupLoc == null || _dropLoc == null ? null : () { Navigator.pop(ctx); _getFare(); },
+                onPressed: () {
+                  if (_pickupLoc == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pickup location not set. Tap the location button or search for a pickup point."), duration: Duration(seconds: 5))); return; }
+                  if (_dropLoc == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please choose a drop location first."), duration: Duration(seconds: 4))); return; }
+                  Navigator.pop(ctx); _getFare();
+                },
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                 child: const Text("Search for Ride", style: TextStyle(fontSize: 16)))),
           ])));
@@ -172,9 +176,15 @@ class _HomePageState extends State<HomePage> {
     setState(() => _isBooking = true);
     try {
       final r = await _api.getFareEstimate(_pickupLoc!.latitude, _pickupLoc!.longitude, _dropLoc!.latitude, _dropLoc!.longitude, rideMode: _rideMode);
-      if (r["success"]) { setState(() => _isBooking = false); _bookingInProgress = false; _showPayment((r["data"]?["total_fare"] ?? 30).toInt(), r["data"]); }
-      else { setState(() => _isBooking = false); _bookingInProgress = false; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r["error"]?["message"] ?? "Error"))); }
-    } catch (e) { setState(() => _isBooking = false); _bookingInProgress = false; ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection error"))); }
+      if (!mounted) return;
+      if (r["success"] == true) { _showPayment((r["data"]?["total_fare"] ?? 30).toInt(), r["data"]); }
+      else { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r["error"]?["message"] ?? "Could not get fare"), duration: const Duration(seconds: 5))); }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Fare error: $e"), duration: const Duration(seconds: 6)));
+    } finally {
+      _bookingInProgress = false;
+      if (mounted) setState(() => _isBooking = false);
+    }
   }
 
   void _showPayment(int amount, Map<String, dynamic>? fare) {
@@ -264,10 +274,17 @@ class _HomePageState extends State<HomePage> {
     try {
       final scheduledStr = _scheduledTime?.toIso8601String();
       final r = await _api.bookRide(_pickupLoc!.latitude, _pickupLoc!.longitude, _pickupCtrl.text, _dropLoc!.latitude, _dropLoc!.longitude, _dropCtrl.text, pm, _appliedPromo ?? "", rideMode: _rideMode, scheduledAt: scheduledStr);
-      if (r["success"]) { if (!mounted) return; Navigator.push(context, MaterialPageRoute(builder: (_) => RideTrackingPage(rideData: r["data"]["ride"]))); }
-      else { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r["error"]?["message"] ?? "Booking failed"))); }
-    } catch (_) {}
-    setState(() => _isBooking = false);
+      if (!mounted) return;
+      if (r["success"] == true && r["data"] != null && r["data"]["ride"] != null) {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => RideTrackingPage(rideData: r["data"]["ride"])));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r["error"]?["message"] ?? "Booking failed"), duration: const Duration(seconds: 5)));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Booking error: $e"), duration: const Duration(seconds: 6)));
+    } finally {
+      if (mounted) setState(() => _isBooking = false);
+    }
   }
 
   void _sos() {
@@ -294,7 +311,7 @@ class _HomePageState extends State<HomePage> {
       _loading
         ? const Center(child: CircularProgressIndicator())
         : FlutterMap(mapController: _mapCtrl, options: MapOptions(center: _currentLoc ?? const LatLng(0, 0), zoom: 15, onTap: (tapPos, latlng) {
-            if (_pinMode) { setState(() { _dropLoc = latlng; _dropCtrl.text = "Pinned location"; _pinMode = false; }); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Drop location set"), duration: Duration(seconds: 2))); }
+            if (_pinMode) { setState(() { _dropLoc = latlng; _dropCtrl.text = "Pinned location"; _pinMode = false; }); }
           }, onLongPress: (tapPos, latlng) {
             setState(() { if (_dropLoc == null) { _dropLoc = latlng; _dropCtrl.text = "Pinned"; } else { _pickupLoc = latlng; _pickupCtrl.text = "Pinned"; _dropLoc = null; _dropCtrl.clear(); } });
           }), children: [
@@ -322,6 +339,21 @@ class _HomePageState extends State<HomePage> {
       ),
       Positioned(right: 16, bottom: 30, child: FloatingActionButton(mini: true, onPressed: _getLocation, backgroundColor: Colors.white,
         child: const Icon(Icons.my_location, color: Color(0xFF6C63FF)))),
+      if (_pinMode) Positioned(left: 16, right: 16, bottom: 90,
+        child: Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: const Color(0xFF6C63FF), borderRadius: BorderRadius.circular(12)),
+          child: Row(children: [
+            const Icon(Icons.touch_app, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            const Expanded(child: Text("Tap the map to set drop location", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600))),
+            GestureDetector(onTap: () => setState(() => _pinMode = false), child: const Icon(Icons.close, color: Colors.white, size: 20)),
+          ]))),
+      if (_isBooking) Positioned.fill(child: Container(color: Colors.black45,
+        child: const Center(child: Card(child: Padding(padding: EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text("Please wait..."),
+          ])))))),
     ]),
   );
 }
