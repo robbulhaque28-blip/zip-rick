@@ -12,6 +12,25 @@ function startScheduler() {
     try {
       const now = new Date();
       
+      // Rescue rides stuck in 'searching'. The 60s timeout in
+      // RideMatchingService lives in memory, so a server restart loses it and
+      // the ride would otherwise stay 'searching' forever - and keep being
+      // re-offered to drivers with its original fare.
+      try {
+        const staleCutoff = new Date(Date.now() - 3 * 60 * 1000);
+        const stale = await Ride.findAll({
+          where: { status: 'searching', created_at: { [Op.lt]: staleCutoff } },
+          limit: 50,
+        });
+        for (const s of stale) {
+          s.status = 'no_driver_found';
+          await s.save();
+          logger.info('Stale search expired: ' + s.ride_number);
+        }
+      } catch (e) {
+        logger.error('Stale ride cleanup failed: ' + e.message);
+      }
+
       const scheduledRides = await Ride.findAll({
         where: {
           status: 'scheduled',

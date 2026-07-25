@@ -126,11 +126,29 @@ module.exports = {
     }, 'Ride booked');
   }),
   getActiveRide: asyncHandler(async (req, res) => {
+    const ACTIVE = ['searching', 'driver_assigned', 'driver_arrived', 'started'];
+    const includeBoth = [
+      { association: 'driver', include: [{ association: 'user', attributes: ['id', 'full_name', 'phone', 'avatar_url'] }, { association: 'vehicle' }] },
+      { association: 'customer', include: [{ association: 'user', attributes: ['id', 'full_name', 'phone', 'avatar_url'] }] },
+    ];
+
+    // Driver: return the ride currently assigned to them.
+    const driver = await Driver.findOne({ where: { user_id: req.userId } });
+    if (driver) {
+      const ride = await Ride.findOne({
+        where: { driver_id: driver.id, status: { [Op.in]: ['driver_assigned', 'driver_arrived', 'started'] } },
+        include: includeBoth,
+        order: [['created_at', 'DESC']]
+      });
+      return success(res, { ride }, ride ? 'Active ride' : 'No active ride');
+    }
+
+    // Customer: return their own in-progress ride.
     const customer = await Customer.findOne({ where: { user_id: req.userId } });
-    if (!customer) return success(res, null, 'No active ride');
+    if (!customer) return success(res, { ride: null }, 'No active ride');
     const ride = await Ride.findOne({
-      where: { customer_id: customer.id, status: { [Op.in]: ['searching', 'driver_assigned', 'driver_arrived', 'started'] } },
-      include: [{ association: 'driver', include: [{ association: 'user', attributes: ['id', 'full_name', 'phone', 'avatar_url'] }, { association: 'vehicle' }] }],
+      where: { customer_id: customer.id, status: { [Op.in]: ACTIVE } },
+      include: includeBoth,
       order: [['created_at', 'DESC']]
     });
     return success(res, { ride }, ride ? 'Active ride' : 'No active ride');
@@ -174,8 +192,11 @@ module.exports = {
     if (!driver.current_latitude || !driver.current_longitude) {
       return success(res, { rides: [] }, 'No location set. Please go online first.');
     }
+    // Only offer rides requested in the last 5 minutes. Without this, a ride
+    // stuck in 'searching' is re-offered forever with its original fare.
+    const cutoff = new Date(Date.now() - 5 * 60 * 1000);
     const searchingRides = await Ride.findAll({
-      where: { status: 'searching' },
+      where: { status: 'searching', created_at: { [Op.gte]: cutoff } },
       order: [['created_at', 'DESC']],
       limit: 20,
     });
