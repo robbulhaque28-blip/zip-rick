@@ -16,7 +16,13 @@ async function start() {
     process.exit(1);
   }
   initializeFirebase();
-  if (config.env === 'development') await sequelize.sync({ alter: false });
+  if (config.env === 'development') {
+    await sequelize.sync({ alter: false });
+  } else if (process.env.RUN_DB_SYNC === 'true') {
+    logger.info('RUN_DB_SYNC=true -> syncing schema (alter)');
+    await sequelize.sync({ alter: true });
+    logger.info('Schema sync complete');
+  }
   startScheduler();
   server.listen(config.port, () => logger.info(`Vybe API running on port ${config.port} [${config.env}]`));
 }
