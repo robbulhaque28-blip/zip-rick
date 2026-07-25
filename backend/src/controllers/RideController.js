@@ -212,7 +212,7 @@ module.exports = {
   cancelRide: asyncHandler(async (req, res) => {
     const ride = await Ride.findByPk(req.params.id);
     if (!ride) throw new ApiError(404, 'Ride not found');
-    if (!['pending', 'searching', 'driver_assigned', 'scheduled'].includes(ride.status)) throw new ApiError(400, 'Cannot cancel at this stage');
+    if (!['pending', 'searching', 'driver_assigned', 'scheduled', 'no_driver_found', 'driver_arrived'].includes(ride.status)) throw new ApiError(400, 'Cannot cancel at this stage');
     const oldStatus = ride.status;
     ride.status = 'cancelled';
     ride.cancellation_reason = req.body.reason || 'User cancelled';
