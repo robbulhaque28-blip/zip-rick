@@ -8,14 +8,17 @@ class FirebaseService {
   static Future<void> initialize() async {
     await Firebase.initializeApp();
 
-    await _messaging.requestPermission(alert: true, badge: true, sound: true);
+    NotificationSettings settings = await _messaging.requestPermission(
+      alert: true, badge: true, sound: true,
+    );
 
     String? token = await _messaging.getToken();
     print('FCM Token: $token');
 
     if (token != null) {
       try {
-        await ApiService().updateFCMToken(token);
+        final api = ApiService();
+        await api.updateFCMToken(token);
       } catch (e) {
         print('FCM register error: $e');
       }
@@ -23,7 +26,9 @@ class FirebaseService {
 
     _messaging.onTokenRefresh.listen((newToken) {
       print('FCM Token refreshed: $newToken');
-      try { ApiService().updateFCMToken(newToken); } catch (e) {}
+      try {
+        ApiService().updateFCMToken(newToken);
+      } catch (e) {}
     });
 
     FirebaseMessaging.onMessage.listen((message) {
@@ -33,16 +38,5 @@ class FirebaseService {
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
       print('Push tapped: ${message.notification?.title}');
     });
-  }
-
-  /// Re-registers the FCM token after a successful login, when the auth
-  /// token finally exists and the backend can associate the device.
-  static Future<void> registerTokenAfterLogin() async {
-    try {
-      final token = await _messaging.getToken();
-      if (token != null) await ApiService().updateFCMToken(token);
-    } catch (e) {
-      print('FCM post-login register error: $e');
-    }
   }
 }
