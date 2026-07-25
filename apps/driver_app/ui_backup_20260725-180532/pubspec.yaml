@@ -1,0 +1,34 @@
+﻿name: vybe_driver
+description: Vybe Driver App
+version: 1.0.0+1
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.0
+  geolocator: ^10.1.0
+  provider: ^6.1.1
+  http: ^1.1.2
+  socket_io_client: ^2.0.3+1
+  shared_preferences: ^2.2.2
+  image_picker: ^1.0.7
+  flutter_rating_bar: ^4.0.1
+  intl: ^0.18.1
+  url_launcher: ^6.2.1
+  firebase_core: ">=2.15.0 <3.0.0"
+  firebase_messaging: ">=14.6.0 <15.0.0"
+  google_fonts: ^6.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true

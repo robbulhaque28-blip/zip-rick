@@ -26,6 +26,7 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
   Map<String, dynamic>? _driverInfo;
   bool _ratingSubmitted = false;
   String _status = 'searching';
+  String? _rideOtp;
   LatLng? _driverLatLng;
   final MapController _mapCtrl = MapController();
   Timer? _statusTimer;
@@ -44,6 +45,7 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
     super.initState();
     _pulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat(reverse: true);
     _pulseAnim = Tween<double>(begin: 0.8, end: 1.2).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+    _rideOtp = widget.rideData["ride_otp"]?.toString();
     _connectSocket();
     _startPolling();
   }
@@ -119,6 +121,7 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
           _status = ride["status"] ?? "searching";
           _driverFound = _status == 'driver_assigned' || _status == 'driver_arrived' || _status == 'started';
           if (ride["driver"] != null) _driverInfo = ride["driver"];
+          if (ride["ride_otp"] != null) _rideOtp = ride["ride_otp"].toString();
         });
         if (_status == 'completed') _statusTimer?.cancel();
       }
@@ -359,8 +362,22 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
         onPressed: () => setState(() => _rideCompleted = true));
     }
     if (_status == 'driver_arrived') {
-      return VybeButton(label: "Enter OTP to start", icon: Icons.lock_open_rounded, color: AppColors.success,
-        onPressed: _showOtpDialog);
+      final otp = _rideOtp;
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: AppColors.ink, borderRadius: BorderRadius.circular(AppRadius.md)),
+        child: Row(children: [
+          const Icon(Icons.lock_open_rounded, color: Colors.white, size: 19),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text("SHARE THIS CODE WITH YOUR DRIVER", style: AppText.tiny.copyWith(color: Colors.white.withOpacity(0.65))),
+            const SizedBox(height: 3),
+            Text("They enter it to start the ride", style: AppText.label.copyWith(color: Colors.white.withOpacity(0.8), fontSize: 11.5)),
+          ])),
+          Text(otp ?? "----", style: AppText.h1.copyWith(color: Colors.white, letterSpacing: 4, fontSize: 22)),
+        ]),
+      );
     }
     if (_status == 'started') {
       return Container(
@@ -368,9 +385,9 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
         padding: const EdgeInsets.symmetric(vertical: 15),
         decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(AppRadius.md)),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const SizedBox(height: 15, width: 15, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
-          const SizedBox(width: 11),
-          Text("Ride in progress", style: AppText.button.copyWith(color: AppColors.primary)),
+          const Icon(Icons.navigation_rounded, size: 17, color: AppColors.primary),
+          const SizedBox(width: 9),
+          Text("Enjoy your ride", style: AppText.button.copyWith(color: AppColors.primary)),
         ]),
       );
     }

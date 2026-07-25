@@ -25,7 +25,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   Timer? _pollTimer; int _bottomNavIndex = 0;
   Set<String> _declinedRideIds = {};
   bool _acceptPending = false;
-  StreamSubscription<Position>? _posSub;
   String? _destAddress;
   List<Map<String, dynamic>> _chatMessages = [];
   final _chatStreamCtrl = StreamController<Map<String, dynamic>>.broadcast();
@@ -33,7 +32,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   @override
   void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); _fetchLocation(); _connectSocket(); _loadProfile(); }
   @override
-  void dispose() { WidgetsBinding.instance.removeObserver(this); _pollTimer?.cancel(); _posSub?.cancel(); _socket?.disconnect(); _socket?.dispose(); super.dispose(); }
+  void dispose() { WidgetsBinding.instance.removeObserver(this); _pollTimer?.cancel(); _socket?.disconnect(); _socket?.dispose(); super.dispose(); }
 
   Future<void> _connectSocket() async {
     final t = await ApiService.getToken(); if (t == null) return;
@@ -58,14 +57,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       _loadActiveRide();
     });
     _socket!.on('ride:taken', (d) { if (mounted && _showingRideRequest) setState(() { _showingRideRequest = false; _rideRequest = null; }); });
-    _socket!.on('ride:status_updated', (d) {
-      if (!mounted) return;
-      _loadActiveRide();
-    });
-    _socket!.on('ride:started', (d) {
-      if (!mounted) return;
-      _loadActiveRide();
-    });
     _socket!.on('ride:cancelled', (d) { if (mounted) setState(() { _hasActiveRide = false; _activeRide = null; _showingRideRequest = false; _rideRequest = null; }); });
     _socket!.on('chat:received', (d) {
       if (d is Map) {
@@ -129,29 +120,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
     }
   }
 
-  void _startLocationStream() {
-    _posSub?.cancel();
-    // Push a position every 20 m so the customer map tracks the driver live.
-    _posSub = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 20),
-    ).listen((pos) {
-      if (!mounted) return;
-      setState(() => _currentLoc = LatLng(pos.latitude, pos.longitude));
-      _sendLocation();
-    }, onError: (_) {});
-  }
-
-  void _stopLocationStream() { _posSub?.cancel(); _posSub = null; }
-
   void _sendLocation() {
     if (_socket != null && _socketConnected && _currentLoc != null) {
       _socket!.emit('driver:location_update', {'latitude': _currentLoc!.latitude, 'longitude': _currentLoc!.longitude});
     }
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _isOnline) _startLocationStream();
   }
 
   Future<void> _loadProfile() async {
@@ -169,8 +141,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
     try {
       final r = await ApiService.toggleOnline();
       setState(() { _isOnline = r['data']?['is_online'] == true; _togglingOnline = false; });
-      if (_isOnline) { _sendLocation(); if (_socket?.connected == true) _socket!.emit('driver:go_online'); _startPolling(); _startLocationStream(); }
-      else { _stopPolling(); _stopLocationStream(); if (_socket?.connected == true) _socket!.emit('driver:go_offline'); }
+      if (_isOnline) { _sendLocation(); if (_socket?.connected == true) _socket!.emit('driver:go_online'); _startPolling(); }
+      else { _stopPolling(); if (_socket?.connected == true) _socket!.emit('driver:go_offline'); }
     } catch (e) {
       setState(() => _togglingOnline = false);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))));
@@ -181,9 +153,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   void _stopPolling() { _pollTimer?.cancel(); _pollTimer = null; }
 
   Future<void> _pollForRides() async {
-    // While on a ride, poll its status instead of looking for new requests.
-    if (_hasActiveRide) { await _loadActiveRide(); return; }
-    if (!_isOnline || _showingRideRequest) return;
+    if (!_isOnline || _hasActiveRide || _showingRideRequest) return;
     try {
       final r = await ApiService.getSearchingRides();
       if (r['data']?['rides'] != null) {
@@ -210,7 +180,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
     await Future.delayed(const Duration(seconds: 3));
     if (!mounted || !_acceptPending) return;
     await _loadActiveRide();
-    _startPolling();
     if (!mounted) return;
     if (_hasActiveRide) {
       setState(() => _acceptPending = false);
@@ -238,42 +207,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       _socket!.emit(e, {'ride_id': _activeRide!['id']});
       if (e == 'ride:complete') setState(() { _hasActiveRide = false; _activeRide = null; });
     }
-  }
-
-  Future<void> _showOtpDialog() async {
-    final ctrl = TextEditingController();
-    String err = '';
-    bool busy = false;
-    await showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setD) => AlertDialog(
-      title: Text('Enter ride OTP', style: AppText.h3),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text('Ask the customer for their 4-digit code.', style: AppText.body.copyWith(fontSize: 13)),
-        const SizedBox(height: 18),
-        TextField(
-          controller: ctrl, keyboardType: TextInputType.number, maxLength: 4,
-          textAlign: TextAlign.center, autofocus: true,
-          style: AppText.h1.copyWith(letterSpacing: 10, fontSize: 24),
-          decoration: const InputDecoration(counterText: '', hintText: '----'),
-        ),
-        if (err.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10),
-          child: Text(err, style: AppText.body.copyWith(color: AppColors.danger, fontSize: 12.5))),
-      ]),
-      actions: [
-        TextButton(onPressed: busy ? null : () => Navigator.pop(ctx), child: const Text('Cancel')),
-        ElevatedButton(onPressed: busy ? null : () async {
-          if (ctrl.text.trim().length != 4) { setD(() => err = 'Enter all 4 digits'); return; }
-          setD(() { busy = true; err = ''; });
-          try {
-            await ApiService.post('/rides/' + (_activeRide?['id']?.toString() ?? '') + '/verify-otp', {'otp': ctrl.text.trim()});
-            if (ctx.mounted) Navigator.pop(ctx);
-            await _loadActiveRide();
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ride started')));
-          } catch (e) {
-            setD(() { busy = false; err = e.toString().replaceFirst('Exception: ', ''); });
-          }
-        }, child: const Text('Verify')),
-      ],
-    )));
   }
 
   void _showDestDialog() {
@@ -533,19 +466,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
           ])),
         ]),
       )),
-      if (status == 'driver_arrived') ...[
+      if (r['ride_otp'] != null) ...[
         const SizedBox(height: 12),
         VybeFadeIn(delayMs: 60, child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(color: AppColors.ink, borderRadius: BorderRadius.circular(AppRadius.lg)),
           child: Row(children: [
-            const Icon(Icons.lock_outline_rounded, color: Colors.white, size: 19),
+            const Icon(Icons.lock_open_rounded, color: Colors.white, size: 19),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('ASK THE CUSTOMER', style: AppText.tiny.copyWith(color: Colors.white.withOpacity(0.65))),
+              Text('SHARE THIS CODE', style: AppText.tiny.copyWith(color: Colors.white.withOpacity(0.65))),
               const SizedBox(height: 3),
-              Text('They will read out a 4-digit code', style: AppText.label.copyWith(color: Colors.white.withOpacity(0.8), fontSize: 11.5)),
+              Text('Customer enters it to start the ride', style: AppText.label.copyWith(color: Colors.white.withOpacity(0.8), fontSize: 11.5)),
             ])),
+            Text('${r['ride_otp']}', style: AppText.h1.copyWith(color: Colors.white, letterSpacing: 4, fontSize: 22)),
           ]),
         )),
       ],
@@ -556,7 +490,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       )),
       const SizedBox(height: 16),
       if (status == 'driver_assigned') VybeButton(label: "I've arrived", icon: Icons.check_circle_rounded, color: AppColors.warning, onPressed: () => _updateStatus('ride:arrived')),
-      if (status == 'driver_arrived') VybeButton(label: 'Enter OTP to start', icon: Icons.lock_open_rounded, color: AppColors.success, onPressed: _showOtpDialog),
+      if (status == 'driver_arrived') VybeButton(label: 'Start ride', icon: Icons.play_arrow_rounded, color: AppColors.success, onPressed: () => _updateStatus('ride:start')),
       if (status == 'started') VybeButton(label: 'Complete ride', icon: Icons.flag_rounded, onPressed: () => _updateStatus('ride:complete')),
       if (status == 'completed') VybeButton(label: 'Done', icon: Icons.home_rounded, color: AppColors.success, onPressed: () => setState(() { _hasActiveRide = false; _activeRide = null; })),
       const SizedBox(height: 11),
