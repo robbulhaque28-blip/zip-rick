@@ -29,6 +29,7 @@ class _HomePageState extends State<HomePage> {
   DateTime? _scheduledTime;
   List<Map<String, dynamic>> _savedPlaces = [];
   bool _bookingInProgress = false;
+  bool _pinMode = false;
 
   @override
   void initState() { super.initState(); _loadSavedPlaces(); _getLocation(); }
@@ -125,6 +126,12 @@ class _HomePageState extends State<HomePage> {
                   const Divider(height: 1),
                   TextField(controller: _dropCtrl, decoration: InputDecoration(labelText: "Drop", prefixIcon: const Icon(Icons.location_on, color: Colors.red, size: 12), border: InputBorder.none, contentPadding: const EdgeInsets.all(16)), onChanged: (v) => _searchPlaces(v, false)),
                   ..._searchResults.where((p) => p["isPickup"] == false).take(3).map((p) => ListTile(dense: true, leading: const Icon(Icons.location_on, size: 16), title: Text(p["display_name"].toString(), style: const TextStyle(fontSize: 13)), onTap: () { _selectPlace(p); setSheet(() {}); })),
+                  Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: SizedBox(width: double.infinity, child: OutlinedButton.icon(
+                      onPressed: () { Navigator.pop(ctx); setState(() => _pinMode = true); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Tap anywhere on the map to set your drop location"), duration: Duration(seconds: 4))); },
+                      icon: const Icon(Icons.add_location_alt, size: 18),
+                      label: const Text("Pin drop location on map"),
+                      style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF6C63FF), side: const BorderSide(color: Color(0xFF6C63FF)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))))
                 ])),
               Container(padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                 child: Row(children: [
@@ -160,8 +167,8 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _getFare() async {
     if (_bookingInProgress) return;
-    _bookingInProgress = true;
     if (_pickupLoc == null || _dropLoc == null) return;
+    _bookingInProgress = true;
     setState(() => _isBooking = true);
     try {
       final r = await _api.getFareEstimate(_pickupLoc!.latitude, _pickupLoc!.longitude, _dropLoc!.latitude, _dropLoc!.longitude, rideMode: _rideMode);
@@ -286,7 +293,9 @@ class _HomePageState extends State<HomePage> {
     body: Stack(children: [
       _loading
         ? const Center(child: CircularProgressIndicator())
-        : FlutterMap(mapController: _mapCtrl, options: MapOptions(center: _currentLoc ?? const LatLng(0, 0), zoom: 15, onLongPress: (tapPos, latlng) {
+        : FlutterMap(mapController: _mapCtrl, options: MapOptions(center: _currentLoc ?? const LatLng(0, 0), zoom: 15, onTap: (tapPos, latlng) {
+            if (_pinMode) { setState(() { _dropLoc = latlng; _dropCtrl.text = "Pinned location"; _pinMode = false; }); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Drop location set"), duration: Duration(seconds: 2))); }
+          }, onLongPress: (tapPos, latlng) {
             setState(() { if (_dropLoc == null) { _dropLoc = latlng; _dropCtrl.text = "Pinned"; } else { _pickupLoc = latlng; _pickupCtrl.text = "Pinned"; _dropLoc = null; _dropCtrl.clear(); } });
           }), children: [
             TileLayer(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", userAgentPackageName: "com.vybe.customer"),

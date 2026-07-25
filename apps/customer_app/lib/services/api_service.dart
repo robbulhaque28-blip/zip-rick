@@ -53,7 +53,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getFareEstimate(double pickupLat, double pickupLng, double dropLat, double dropLng, {String rideMode = 'single'}) async {
-    final res = await http.post(Uri.parse(baseUrl + '/rides/estimate'), headers: await _headers(), body: jsonEncode({'pickup_latitude': pickupLat, 'pickup_longitude': pickupLng, 'drop_latitude': dropLat, 'drop_longitude': dropLng, 'ride_mode': rideMode}));
+    final res = await http.post(Uri.parse(baseUrl + '/rides/estimate'), headers: await _headers(), body: jsonEncode({'pickup_latitude': pickupLat, 'pickup_longitude': pickupLng, 'drop_latitude': dropLat, 'drop_longitude': dropLng, 'ride_mode': rideMode})).timeout(const Duration(seconds: 30));
     return jsonDecode(res.body);
   }
 
