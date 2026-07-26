@@ -30,6 +30,7 @@ const AdminUser = require('./AdminUser');
 const SystemSetting = require('./SystemSetting');
 const AuditLog = require('./AuditLog');
 const ChatMessage = require('./ChatMessage');
+const EmergencyContact = require('./EmergencyContact');
 
 // ============================
 // Association Definitions
@@ -96,6 +97,10 @@ Transaction.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
 // User -> Notifications (1:N)
 User.hasMany(Notification, { foreignKey: 'user_id', as: 'notifications' });
+
+// Emergency contacts (SOS)
+User.hasMany(EmergencyContact, { foreignKey: 'user_id', as: 'emergencyContacts' });
+EmergencyContact.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 Notification.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
 // Customer -> SavedPlaces (1:N)
@@ -167,6 +172,7 @@ const db = {
   SystemSetting,
   AuditLog,
   ChatMessage,
+  EmergencyContact,
 };
 
 logger.info(`Loaded ${Object.keys(db).length - 2} database models`);

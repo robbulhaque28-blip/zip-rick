@@ -45,6 +45,67 @@ class AuthService {
     return { user: user.getSafeProfile(), profile, tokens, is_new_user: !user.last_login_at };
   }
 
+  /**
+   * Update the signed-in user's own profile.
+   *
+   * AuthController.updateProfile has always called authService.updateProfile(),
+   * but this method never existed - so PUT /auth/profile threw
+   * "authService.updateProfile is not a function" and returned a 500 on every
+   * request, including an empty body. Only a safe allow-list of columns is
+   * writable here; role, phone and verification flags are deliberately not.
+   */
+  async updateProfile(userId, data = {}) {
+    const user = await User.findByPk(userId);
+    if (!user) throw new ApiError(404, 'User not found');
+
+    if (typeof data.full_name === 'string' && data.full_name.trim() !== '') {
+      user.full_name = data.full_name.trim();
+    }
+    if (typeof data.email === 'string') {
+      const email = data.email.trim();
+      if (email === '') {
+        user.email = null;
+      } else {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          throw new ApiError(400, 'Please enter a valid email address');
+        }
+        const clash = await User.findOne({ where: { email } });
+        if (clash && clash.id !== user.id) {
+          throw new ApiError(409, 'That email is already in use');
+        }
+        user.email = email;
+      }
+    }
+    if (typeof data.avatar_url === 'string') {
+      user.avatar_url = data.avatar_url.trim() === '' ? null : data.avatar_url.trim();
+    }
+
+    await user.save();
+
+    let profile = null;
+    const customer = await Customer.findOne({ where: { user_id: user.id } });
+    if (customer) {
+      if (data.gender !== undefined) customer.gender = data.gender;
+      if (data.date_of_birth !== undefined) customer.date_of_birth = data.date_of_birth || null;
+      await customer.save();
+      profile = customer;
+    } else {
+      const driver = await Driver.findOne({ where: { user_id: user.id } });
+      if (driver) {
+        if (data.gender !== undefined) driver.gender = data.gender;
+        if (data.date_of_birth !== undefined) driver.date_of_birth = data.date_of_birth || null;
+        if (data.address !== undefined) driver.address = data.address;
+        if (data.city !== undefined) driver.city = data.city;
+        if (data.state !== undefined) driver.state = data.state;
+        if (data.pincode !== undefined) driver.pincode = data.pincode;
+        await driver.save();
+        profile = driver;
+      }
+    }
+
+    return { user: user.getSafeProfile(), profile };
+  }
+
   async adminLogin(email, password) {
     const bcrypt = require('bcryptjs');
     const { sequelize } = require('../models');
