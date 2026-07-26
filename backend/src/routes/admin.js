@@ -3,7 +3,9 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { asyncHandler, ApiError } = require('../middleware/errorHandler');
 const { success, paginated } = require('../utils/response');
 const { Op, literal } = require('sequelize');
-const { User, Driver, Customer, Ride, Payment, AdminUser, SystemSetting, PromoCode, SupportTicket, AuditLog, DriverRegistrationPayment } = require('../models');
+const { User, Driver, Customer, Ride, Payment, AdminUser, SystemSetting, PromoCode, SupportTicket, AuditLog, DriverRegistrationPayment,
+        DriverDocument, Vehicle, RideStatusLog, RatingReview, ChatMessage, PromoRedemption, Referral, SavedPlace,
+        SupportTicketMessage, Transaction, Wallet, Notification } = require('../models');
 const { sequelize } = require('../config/db');
 
 router.use(authenticate);
@@ -565,6 +567,125 @@ router.get('/reports/revenue', asyncHandler(async (req, res) => {
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename=revenue.csv');
   res.send(csv);
+}));
+
+// ---------------------------------------------------------------------------
+// Delete a specific customer (restored - was removed in commit 541046c)
+//
+// There are NO onDelete:CASCADE rules on any association in this project, so
+// Postgres will refuse to delete a row that still has children pointing at it.
+// The original version of this route only did c.destroy() + User.destroy(),
+// which is why it started failing the moment a customer had any rides,
+// payments or wallet rows. Everything below runs inside one transaction and
+// removes children first, deepest level outwards.
+// ---------------------------------------------------------------------------
+router.delete('/customers/:id', asyncHandler(async (req, res) => {
+  const c = await Customer.findByPk(req.params.id);
+  if (!c) throw new ApiError(404, 'Customer not found');
+  const userId = c.user_id;
+
+  await sequelize.transaction(async (t) => {
+    const rides = await Ride.findAll({
+      where: { customer_id: c.id }, attributes: ['id'], transaction: t,
+    });
+    const rideIds = rides.map(r => r.id);
+
+    if (rideIds.length) {
+      await RideStatusLog.destroy({ where: { ride_id: rideIds }, transaction: t });
+      await ChatMessage.destroy({ where: { ride_id: rideIds }, transaction: t });
+      await RatingReview.destroy({ where: { ride_id: rideIds }, transaction: t });
+      await PromoRedemption.destroy({ where: { ride_id: rideIds }, transaction: t });
+      await Payment.destroy({ where: { ride_id: rideIds }, transaction: t });
+    }
+
+    // Free any driver still pointing at one of these rides, otherwise that
+    // driver is silently excluded from ride matching forever.
+    if (rideIds.length) {
+      await Driver.update(
+        { is_available: true, current_ride_id: null },
+        { where: { current_ride_id: rideIds }, transaction: t }
+      );
+    }
+
+    await Payment.destroy({ where: { customer_id: c.id }, transaction: t });
+    await Ride.destroy({ where: { customer_id: c.id }, transaction: t });
+    await SavedPlace.destroy({ where: { customer_id: c.id }, transaction: t });
+    await Referral.destroy({ where: { referrer_customer_id: c.id }, transaction: t });
+    await Referral.destroy({ where: { referred_customer_id: c.id }, transaction: t });
+
+    await c.destroy({ transaction: t });
+
+    // User-level children. Only remove the user if they have no driver profile.
+    const stillDriver = await Driver.findOne({ where: { user_id: userId }, transaction: t });
+    if (!stillDriver) {
+      await PromoRedemption.destroy({ where: { user_id: userId }, transaction: t });
+      await Transaction.destroy({ where: { user_id: userId }, transaction: t });
+      await Wallet.destroy({ where: { user_id: userId }, transaction: t });
+      await Notification.destroy({ where: { user_id: userId }, transaction: t });
+
+      const tickets = await SupportTicket.findAll({
+        where: { user_id: userId }, attributes: ['id'], transaction: t,
+      });
+      const ticketIds = tickets.map(x => x.id);
+      if (ticketIds.length) {
+        await SupportTicketMessage.destroy({ where: { ticket_id: ticketIds }, transaction: t });
+      }
+      await SupportTicket.destroy({ where: { user_id: userId }, transaction: t });
+
+      await User.destroy({ where: { id: userId }, transaction: t });
+    }
+  });
+
+  return success(res, null, 'Customer deleted');
+}));
+
+// ---------------------------------------------------------------------------
+// Delete a specific driver (restored - was removed in commit 541046c)
+// ---------------------------------------------------------------------------
+router.delete('/drivers/:id', asyncHandler(async (req, res) => {
+  const d = await Driver.findByPk(req.params.id);
+  if (!d) throw new ApiError(404, 'Driver not found');
+  const userId = d.user_id;
+
+  await sequelize.transaction(async (t) => {
+    // Detach the driver from their rides rather than deleting the rides -
+    // those rides belong to a customer and are part of that customer's history.
+    await Ride.update(
+      { driver_id: null },
+      { where: { driver_id: d.id }, transaction: t }
+    );
+    await Payment.update(
+      { driver_id: null },
+      { where: { driver_id: d.id }, transaction: t }
+    );
+
+    await DriverDocument.destroy({ where: { driver_id: d.id }, transaction: t });
+    await DriverRegistrationPayment.destroy({ where: { driver_id: d.id }, transaction: t });
+    await Vehicle.destroy({ where: { driver_id: d.id }, transaction: t });
+
+    await d.destroy({ transaction: t });
+
+    const stillCustomer = await Customer.findOne({ where: { user_id: userId }, transaction: t });
+    if (!stillCustomer) {
+      await PromoRedemption.destroy({ where: { user_id: userId }, transaction: t });
+      await Transaction.destroy({ where: { user_id: userId }, transaction: t });
+      await Wallet.destroy({ where: { user_id: userId }, transaction: t });
+      await Notification.destroy({ where: { user_id: userId }, transaction: t });
+
+      const tickets = await SupportTicket.findAll({
+        where: { user_id: userId }, attributes: ['id'], transaction: t,
+      });
+      const ticketIds = tickets.map(x => x.id);
+      if (ticketIds.length) {
+        await SupportTicketMessage.destroy({ where: { ticket_id: ticketIds }, transaction: t });
+      }
+      await SupportTicket.destroy({ where: { user_id: userId }, transaction: t });
+
+      await User.destroy({ where: { id: userId }, transaction: t });
+    }
+  });
+
+  return success(res, null, 'Driver deleted');
 }));
 
 module.exports = router;
