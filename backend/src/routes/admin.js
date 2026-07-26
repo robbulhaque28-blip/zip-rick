@@ -285,7 +285,66 @@ router.put('/support-tickets/:id', asyncHandler(async (req, res) => {
   return success(res, { ticket: t }, 'Updated');
 }));
 
+// ---------------------------------------------------------------------------
+// Push diagnostics.
+//
+// Answers, without ever exposing the private key:
+//   - are the Firebase credentials set on this server at all?
+//   - WHICH Firebase project do they belong to?
+//   - how many users actually have an FCM token stored?
+// ---------------------------------------------------------------------------
+router.get('/push/status', asyncHandler(async (req, res) => {
+  const { getStatus } = require('../services/FirebaseService');
+  const status = getStatus();
+
+  const totalUsers = await User.count({ where: { is_active: true } });
+  const withToken = await User.count({ where: { is_active: true, fcm_token: { [Op.ne]: null } } });
+
+  const drivers = await Driver.findAll({
+    include: [{ association: 'user', attributes: ['id', 'full_name', 'fcm_token'] }],
+    limit: 50,
+  });
+  const customers = await Customer.findAll({
+    include: [{ association: 'user', attributes: ['id', 'full_name', 'fcm_token'] }],
+    limit: 50,
+  });
+
+  const shape = (rows) => rows.map(r => ({
+    name: r.user?.full_name || null,
+    has_token: !!r.user?.fcm_token,
+    token_preview: r.user?.fcm_token ? String(r.user.fcm_token).slice(0, 14) + '...' : null,
+  }));
+
+  return success(res, {
+    firebase: status,
+    tokens: { active_users: totalUsers, with_fcm_token: withToken },
+    drivers: shape(drivers),
+    customers: shape(customers),
+  }, 'Push status');
+}));
+
+// Send a real test push to one user, and report exactly what happened.
+router.post('/push/test/:userId', asyncHandler(async (req, res) => {
+  const { sendPushDetailed } = require('../services/FirebaseService');
+  const result = await sendPushDetailed(
+    req.params.userId,
+    req.body.title || 'Vybe test',
+    req.body.message || 'Push notifications are working.',
+    { type: 'admin_test' }
+  );
+  return success(res, result, result.ok ? 'Test push sent' : 'Test push failed: ' + result.reason);
+}));
+
+// Broadcast a notification.
+//
+// This used to only COUNT matching users and return that number as "sent" -
+// it never contacted Firebase, so the admin saw "Broadcast sent" while every
+// phone stayed silent. It now actually delivers and reports real figures.
 router.post('/notifications/broadcast', asyncHandler(async (req, res) => {
+  const title = (req.body.title || '').toString().trim();
+  const message = (req.body.message || req.body.body || '').toString().trim();
+  if (!title || !message) throw new ApiError(400, 'Title and message are required');
+
   const ids = [];
   if (req.body.target_role === 'all') {
     const u = await User.findAll({ where: { is_active: true }, attributes: ['id'] });
@@ -297,7 +356,36 @@ router.post('/notifications/broadcast', asyncHandler(async (req, res) => {
     const c = await Customer.findAll({ include: [{ association: 'user', where: { is_active: true }, attributes: ['id'] }] });
     ids.push(...c.map(x => x.user_id));
   }
-  return success(res, { sent: ids.length }, 'Broadcast sent');
+
+  const { sendPushNotification } = require('../services/FirebaseService');
+  const { Notification } = require('../models');
+
+  let delivered = 0;
+  let failed = 0;
+  for (const userId of ids) {
+    // Always store it so the user can see it in-app even if push is off.
+    try {
+      await Notification.create({
+        user_id: userId,
+        title,
+        message,
+        type: 'admin_broadcast',
+      });
+    } catch (e) { /* notification row is best-effort */ }
+
+    try {
+      const ok = await sendPushNotification(userId, title, message, { type: 'admin_broadcast' });
+      if (ok) delivered++; else failed++;
+    } catch (e) {
+      failed++;
+    }
+  }
+
+  return success(
+    res,
+    { targeted: ids.length, delivered, failed },
+    `Broadcast: ${delivered} delivered, ${failed} could not be reached`
+  );
 }));
 
 router.get('/settings', asyncHandler(async (req, res) => {

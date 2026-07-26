@@ -21,6 +21,10 @@ plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "9.0.1" apply false
     id("org.jetbrains.kotlin.android") version "2.0.21" apply false
+    // Reads google-services.json and generates the values.xml that Firebase
+    // needs at runtime. Without this the app logs "Failed to load
+    // FirebaseOptions from resource" and push can never work.
+    id("com.google.gms.google-services") version "4.4.2" apply false
 }
 
 include(":app")

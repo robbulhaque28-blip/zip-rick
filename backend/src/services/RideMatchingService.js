@@ -100,6 +100,24 @@ class RideMatchingService {
           customer_drop: ride.drop_address,
         });
         logger.info(`Ride request ${ride.ride_number} sent to driver ${driverUserId} (${entry.distance_km.toFixed(1)}km away)`);
+
+        // Also send a push. The socket only reaches drivers who have the app
+        // open and connected; without this a driver misses the booking
+        // entirely when the app is backgrounded or the screen is off.
+        try {
+          await sendPushNotification(
+            driverUserId,
+            'New ride request',
+            `${ride.pickup_address || 'Pickup'} -> ${ride.drop_address || 'Drop'}  ·  Rs ${ride.total_fare}`,
+            {
+              ride_id: ride.id.toString(),
+              type: 'ride_request',
+              android_channel_id: 'vybe_ride_requests',
+            }
+          );
+        } catch (e) {
+          logger.error('Ride request push failed: ' + e.message);
+        }
       }
     }
 
