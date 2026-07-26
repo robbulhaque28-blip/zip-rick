@@ -38,6 +38,7 @@ class SocketService extends ChangeNotifier {
   io.Socket? _socket;
   bool _connected = false;
   String? _rideStatus;
+  String? _lastRideId;
   LatLng? _driverLatLng;
 
   // Chat messages
@@ -47,6 +48,12 @@ class SocketService extends ChangeNotifier {
   bool get connected => _connected;
   LatLng? get driverLatLng => _driverLatLng;
   String? get rideStatus => _rideStatus;
+  String? get lastRideId => _lastRideId;
+
+  static String? _extractRideId(dynamic data) {
+    if (data is Map) return (data['ride_id'] ?? data['id'])?.toString();
+    return null;
+  }
   List<ChatMessage> get chatMessages => List.unmodifiable(_chatMessages);
   Stream<ChatMessage> get chatStream => _chatController.stream;
 
@@ -62,21 +69,25 @@ class SocketService extends ChangeNotifier {
     });
 
     _socket!.on('ride:accepted', (data) {
-      _rideStatus = 'accepted';
+      _lastRideId = _extractRideId(data);
+      _rideStatus = 'driver_assigned';
       notifyListeners();
     });
 
     _socket!.on('ride:driver_arrived', (data) {
-      _rideStatus = 'arrived';
+      _lastRideId = _extractRideId(data);
+      _rideStatus = 'driver_arrived';
       notifyListeners();
     });
 
     _socket!.on('ride:started', (data) {
+      _lastRideId = _extractRideId(data);
       _rideStatus = 'started';
       notifyListeners();
     });
 
     _socket!.on('ride:completed', (data) {
+      _lastRideId = _extractRideId(data);
       _rideStatus = 'completed';
       notifyListeners();
     });

@@ -70,7 +70,10 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
 
   void _onSocketUpdate() {
     if (!mounted) return;
-    if (_socketService?.rideStatus != null) setState(() => _status = _socketService!.rideStatus!);
+    // Deliberately NOT taking status from the socket. The socket carries a
+    // single global "last status" that is not scoped to this ride, and its
+    // names ('accepted'/'arrived') do not match the server's ride statuses.
+    // Polling getRideDetail(rideId) is the single source of truth.
     final newLoc = _socketService?.driverLatLng;
     if (newLoc != null) {
       if (_driverLatLng != null) {
@@ -82,12 +85,11 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
           _animStep = 0;
           _runAnimStep();
         } else {
-          setState(() { _driverLatLng = newLoc; _driverFound = true; });
+          setState(() => _driverLatLng = newLoc);
         }
       } else {
-        setState(() { _driverLatLng = newLoc; _driverFound = true; });
+        setState(() => _driverLatLng = newLoc);
       }
-      _driverFound = true;
       _mapCtrl.move(newLoc, 15);
     }
   }
@@ -108,22 +110,36 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
   }
 
   void _startPolling() {
-    _statusTimer = Timer.periodic(const Duration(seconds: 5), (_) => _checkStatus());
+    _checkStatus();
+    _statusTimer = Timer.periodic(const Duration(seconds: 4), (_) => _checkStatus());
   }
 
   Future<void> _checkStatus() async {
     try {
-      final r = await _api.getActiveRide();
-      if (r["success"] && r["data"]?["ride"] != null) {
-        final ride = r["data"]["ride"];
-        if (!mounted) return;
-        setState(() {
-          _status = ride["status"] ?? "searching";
-          _driverFound = _status == 'driver_assigned' || _status == 'driver_arrived' || _status == 'started';
-          if (ride["driver"] != null) _driverInfo = ride["driver"];
-          if (ride["ride_otp"] != null) _rideOtp = ride["ride_otp"].toString();
-        });
-        if (_status == 'completed') _statusTimer?.cancel();
+      final rideId = widget.rideData["id"]?.toString() ?? "";
+      if (rideId.isEmpty) return;
+      // Poll THIS ride by its id. Never use /rides/active here: that returns
+      // whatever ride the account currently has in progress, which may be an
+      // older ride left unfinished - that is what made a brand new booking
+      // show up as already started with a driver attached.
+      final r = await _api.getRideDetail(rideId);
+      final ride = r["data"]?["ride"];
+      if (ride == null || !mounted) return;
+      final polledId = ride["id"]?.toString() ?? "";
+      if (polledId.isNotEmpty && polledId != rideId) return;
+      final st = ride["status"]?.toString() ?? "searching";
+      setState(() {
+        _status = st;
+        _driverFound = st == 'driver_assigned' || st == 'driver_arrived' || st == 'started';
+        if (ride["driver"] != null) {
+          _driverInfo = ride["driver"];
+        } else {
+          _driverInfo = null;
+        }
+        if (ride["ride_otp"] != null) _rideOtp = ride["ride_otp"].toString();
+      });
+      if (st == 'completed' || st == 'cancelled' || st == 'no_driver_found') {
+        _statusTimer?.cancel();
       }
     } catch (_) {}
   }
@@ -357,6 +373,9 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
   }
 
   Widget _buildActionButton() {
+    if (_status == 'no_driver_found' || _status == 'cancelled') {
+      return VybeButton(label: "Back to home", icon: Icons.home_rounded, onPressed: _goHome);
+    }
     if (_status == 'completed') {
       return VybeButton(label: "Rate your ride", icon: Icons.star_rounded, color: AppColors.success,
         onPressed: () => setState(() => _rideCompleted = true));
@@ -411,6 +430,7 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
   }
 
   Color _statusColor() {
+    if (_status == 'no_driver_found' || _status == 'cancelled') return AppColors.danger;
     if (_status == 'driver_assigned') return AppColors.warning;
     if (_status == 'driver_arrived') return AppColors.success;
     if (_status == 'started') return AppColors.primary;
@@ -419,6 +439,8 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
   }
 
   IconData _statusIcon() {
+    if (_status == 'no_driver_found') return Icons.person_search_rounded;
+    if (_status == 'cancelled') return Icons.cancel_rounded;
     if (_status == 'driver_assigned') return Icons.directions_car_rounded;
     if (_status == 'driver_arrived') return Icons.check_circle_rounded;
     if (_status == 'started') return Icons.navigation_rounded;
@@ -427,6 +449,8 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
   }
 
   String _statusText() {
+    if (_status == 'no_driver_found') return "No drivers available";
+    if (_status == 'cancelled') return "Ride cancelled";
     if (_status == 'driver_assigned' && _driverInfo != null) return "Driver on the way";
     if (_status == 'driver_assigned') return "Driver assigned";
     if (_status == 'driver_arrived') return "Driver has arrived";
@@ -436,6 +460,8 @@ class _RideTrackingPageState extends State<RideTrackingPage> with TickerProvider
   }
 
   String _statusSubtitle() {
+    if (_status == 'no_driver_found') return "No e-rickshaw was free nearby. Please try again.";
+    if (_status == 'cancelled') return "This ride was cancelled";
     if (_status == 'searching') return "Hang tight, this usually takes a moment";
     if (_driverInfo != null) return "Ride #${widget.rideData["ride_number"] ?? ""}";
     return "Ride #${widget.rideData["ride_number"] ?? ""}";

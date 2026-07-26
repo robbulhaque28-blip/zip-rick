@@ -70,3 +70,5 @@ coverage/
 
 # Testing
 .cache/
+
+apps/customer_app/ui_backup_*/

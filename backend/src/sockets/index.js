@@ -50,6 +50,20 @@ function setupSocketIO(server) {
     }
   });
 
+// Rooms are joined as `user:<users.id>`, but ride.customer_id points at the
+// customers table. Emitting to `user:${ride.customer_id}` therefore goes to a
+// room nobody is in, so the customer silently misses live-tracking, arrival,
+// start and completion events. Resolve the real user id first.
+async function customerRoom(ride) {
+  try {
+    if (!ride) return null;
+    const c = await Customer.findByPk(ride.customer_id, { attributes: ['user_id'] });
+    return c ? `user:${c.user_id}` : null;
+  } catch (e) {
+    return null;
+  }
+}
+
   io.on('connection', (socket) => {
     const { userId, userRole } = socket;
 
@@ -85,7 +99,8 @@ function setupSocketIO(server) {
             attributes: ['id', 'customer_id'],
           });
           if (ride) {
-            io.to(`user:${ride.customer_id}`).emit('ride:driver_location', {
+            const room = await customerRoom(ride);
+            if (room) io.to(room).emit('ride:driver_location', {
               ride_id: ride.id,
               driver_id: driver.id,
               latitude,
@@ -140,7 +155,8 @@ function setupSocketIO(server) {
           return;
         }
         if (ride) {
-          io.to(`user:${ride.customer_id}`).emit('ride:accepted', {
+          const room = await customerRoom(ride);
+          if (room) io.to(room).emit('ride:accepted', {
             ride_id: ride.id,
             driver: {
               id: driver.id,
@@ -185,7 +201,8 @@ function setupSocketIO(server) {
           changed_by: 'driver', changed_by_id: userId,
         });
 
-        io.to(`user:${ride.customer_id}`).emit('ride:driver_arrived', { ride_id });
+        const room = await customerRoom(ride);
+        if (room) io.to(room).emit('ride:driver_arrived', { ride_id });
         socket.emit('ride:status_updated', { ride_id, status: 'driver_arrived' });
         
         // Push
@@ -208,7 +225,8 @@ function setupSocketIO(server) {
           changed_by: 'driver', changed_by_id: userId,
         });
 
-        io.to(`user:${ride.customer_id}`).emit('ride:started', { ride_id });
+        const room = await customerRoom(ride);
+        if (room) io.to(room).emit('ride:started', { ride_id });
         socket.emit('ride:status_updated', { ride_id, status: 'started' });
         
         // Push
@@ -236,7 +254,8 @@ function setupSocketIO(server) {
           { where: { id: ride.driver_id } }
         );
 
-        io.to(`user:${ride.customer_id}`).emit('ride:completed', {
+        const room = await customerRoom(ride);
+        if (room) io.to(room).emit('ride:completed', {
           ride_id,
           total_fare: ride.total_fare,
           payment_method: ride.payment_method,
