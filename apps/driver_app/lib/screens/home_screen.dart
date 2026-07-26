@@ -144,8 +144,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   void _stopLocationStream() { _posSub?.cancel(); _posSub = null; }
 
   void _sendLocation() {
-    if (_socket != null && _socketConnected && _currentLoc != null) {
-      _socket!.emit('driver:location_update', {'latitude': _currentLoc!.latitude, 'longitude': _currentLoc!.longitude});
+    final loc = _currentLoc;
+    if (loc == null) return;
+    if (_socket != null && _socketConnected) {
+      _socket!.emit('driver:location_update', {'latitude': loc.latitude, 'longitude': loc.longitude});
+      return;
+    }
+    // Socket is down. Fall back to HTTP so the stored position does not go
+    // stale and silently drop this driver out of matching.
+    if (_isOnline) {
+      ApiService.sendLocation(loc.latitude, loc.longitude).catchError((_) => <String, dynamic>{});
     }
   }
 
@@ -164,16 +172,58 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   }
 
   Future<void> _toggleOnline() async {
-    if (_currentLoc == null) { await _fetchLocation(); if (_currentLoc == null) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enable GPS first'))); return; } }
+    final goingOnline = !_isOnline;
+
+    // Going online without coordinates makes this driver invisible to ride
+    // matching, so insist on a real fix before asking the server.
+    if (goingOnline && _currentLoc == null) {
+      setState(() => _togglingOnline = true);
+      await _fetchLocation();
+      if (!mounted) return;
+      if (_currentLoc == null) {
+        setState(() => _togglingOnline = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not get your location. Turn on GPS and try again.'),
+          duration: Duration(seconds: 5)));
+        return;
+      }
+    }
+
     setState(() => _togglingOnline = true);
     try {
-      final r = await ApiService.toggleOnline();
-      setState(() { _isOnline = r['data']?['is_online'] == true; _togglingOnline = false; });
-      if (_isOnline) { _sendLocation(); if (_socket?.connected == true) _socket!.emit('driver:go_online'); _startPolling(); _startLocationStream(); }
-      else { _stopPolling(); _stopLocationStream(); if (_socket?.connected == true) _socket!.emit('driver:go_offline'); }
+      final r = await ApiService.toggleOnline(
+        latitude: goingOnline ? _currentLoc?.latitude : null,
+        longitude: goingOnline ? _currentLoc?.longitude : null,
+        isOnline: goingOnline,
+      );
+      final data = r['data'];
+      if (!mounted) return;
+      setState(() { _isOnline = data?['is_online'] == true; _togglingOnline = false; });
+
+      if (_isOnline) {
+        // Confirm the server actually stored a position. If it did not, the
+        // driver would sit online receiving nothing at all.
+        final hasFix = data?['current_latitude'] != null && data?['current_longitude'] != null;
+        if (!hasFix) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Online, but your location is not set yet. Ride requests may not arrive.'),
+            duration: Duration(seconds: 6)));
+        }
+        _sendLocation();
+        if (_socket?.connected == true) _socket!.emit('driver:go_online');
+        _startPolling();
+        _startLocationStream();
+      } else {
+        _stopPolling();
+        _stopLocationStream();
+        if (_socket?.connected == true) _socket!.emit('driver:go_offline');
+      }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _togglingOnline = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e.toString().replaceFirst("Exception: ", "")),
+        duration: const Duration(seconds: 5)));
     }
   }
 

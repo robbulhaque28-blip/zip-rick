@@ -60,7 +60,22 @@ class ApiService {
   static Future<Map<String, dynamic>> getProfile() => get('/drivers/profile');
   static Future<Map<String, dynamic>> updateProfile(Map data) => put('/drivers/profile', data);
   static Future<Map<String, dynamic>> saveVehicle(Map data) => post('/drivers/vehicle', data);
-  static Future<Map<String, dynamic>> toggleOnline() => post('/drivers/toggle-online', {});
+  // Send the driver's coordinates with the request. Without them the server
+  // can leave the driver online but with no position, which makes them
+  // invisible to ride matching.
+  static Future<Map<String, dynamic>> toggleOnline({double? latitude, double? longitude, bool? isOnline}) {
+    final body = <String, dynamic>{};
+    if (latitude != null && longitude != null) {
+      body['latitude'] = latitude;
+      body['longitude'] = longitude;
+    }
+    if (isOnline != null) body['is_online'] = isOnline;
+    return post('/drivers/toggle-online', body);
+  }
+
+  // HTTP fallback for refreshing location when the socket is down.
+  static Future<Map<String, dynamic>> sendLocation(double latitude, double longitude) =>
+      post('/drivers/location', {'latitude': latitude, 'longitude': longitude});
   static Future<Map<String, dynamic>> getEarnings() => get('/drivers/earnings');
   static Future<Map<String, dynamic>> getRideHistory({int page = 1}) => get('/rides/history?page=$page&limit=20');
   static Future<Map<String, dynamic>> getActiveRide() => get('/rides/active');

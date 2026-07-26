@@ -87,13 +87,77 @@ router.get("/earnings", asyncHandler(async (req, res) => {
   return success(res, { total_earnings: driver.total_earnings, total_rides: driver.total_rides, today_earnings: todayE, week_earnings: weekE, rating_avg: driver.rating_avg });
 }));
 
+// Go online / offline.
+//
+// This endpoint used to ONLY flip a boolean and ignore any latitude/longitude
+// in the body. Location arrived exclusively over the socket
+// ('driver:location_update'), so if the socket was not connected at the moment
+// the driver went online, they ended up online with current_latitude = NULL.
+// RideMatchingService.findNearbyDrivers requires current_latitude != null, so
+// that driver was silently excluded from EVERY search and received zero ride
+// offers - the same failure mode as the stuck-ride bug.
+//
+// Now the coordinates are persisted here too, and going online without a
+// usable position is rejected outright instead of failing silently later.
 router.post("/toggle-online", asyncHandler(async (req, res) => {
   const driver = await Driver.findOne({ where: { user_id: req.userId } });
+  if (!driver) throw new ApiError(404, "Driver not found");
   if (driver.registration_status !== "approved") throw new ApiError(403, "Your account is pending approval. Please wait for admin verification.");
-  driver.is_online = !driver.is_online;
-  driver.is_available = driver.is_online;
+
+  // Allow an explicit target so a retry is idempotent; otherwise toggle.
+  const goingOnline = (req.body && typeof req.body.is_online === "boolean")
+    ? req.body.is_online
+    : !driver.is_online;
+
+  if (goingOnline) {
+    const lat = parseFloat(req.body?.latitude);
+    const lng = parseFloat(req.body?.longitude);
+    const hasFix = Number.isFinite(lat) && Number.isFinite(lng)
+      && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
+      && !(lat === 0 && lng === 0);
+
+    if (hasFix) {
+      driver.current_latitude = lat;
+      driver.current_longitude = lng;
+      driver.last_location_update = new Date();
+    } else if (driver.current_latitude == null || driver.current_longitude == null) {
+      // No coordinates in the request and none stored - going online would
+      // make this driver invisible to matching. Fail loudly instead.
+      throw new ApiError(400, "We could not read your location. Turn on GPS and try again.");
+    }
+  }
+
+  driver.is_online = goingOnline;
+  driver.is_available = goingOnline;
   await driver.save();
-  return success(res, { is_online: driver.is_online });
+
+  return success(res, {
+    is_online: driver.is_online,
+    is_available: driver.is_available,
+    current_latitude: driver.current_latitude,
+    current_longitude: driver.current_longitude,
+  });
+}));
+
+// Standalone location ping. Gives the app an HTTP fallback for keeping the
+// driver's position fresh when the socket has dropped.
+router.post("/location", asyncHandler(async (req, res) => {
+  const driver = await Driver.findOne({ where: { user_id: req.userId } });
+  if (!driver) throw new ApiError(404, "Driver not found");
+
+  const lat = parseFloat(req.body?.latitude);
+  const lng = parseFloat(req.body?.longitude);
+  const ok = Number.isFinite(lat) && Number.isFinite(lng)
+    && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
+    && !(lat === 0 && lng === 0);
+  if (!ok) throw new ApiError(400, "Valid latitude and longitude are required");
+
+  driver.current_latitude = lat;
+  driver.current_longitude = lng;
+  driver.last_location_update = new Date();
+  await driver.save();
+
+  return success(res, { latitude: driver.current_latitude, longitude: driver.current_longitude });
 }));
 
 // Registration fee payment
