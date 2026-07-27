@@ -8,6 +8,33 @@ const { User, Driver, Customer, Ride, Payment, AdminUser, SystemSetting, PromoCo
         SupportTicketMessage, Transaction, Wallet, Notification } = require('../models');
 const { sequelize } = require('../config/db');
 
+// ---------------------------------------------------------------------------
+// system_settings.value is a TEXT column, but several handlers passed a raw
+// object to upsert(). Sequelize rejected that with "value cannot be an array
+// or an object", so EVERY object-shaped setting silently failed to save -
+// fare rates, registration fee and commission all included. The GET side had
+// the mirror problem: it returned the raw string instead of parsed JSON.
+// ---------------------------------------------------------------------------
+function parseSetting(row, fallback) {
+  if (!row || row.value == null) return fallback;
+  let v = row.value;
+  if (typeof v === 'string') {
+    try { v = JSON.parse(v); } catch (e) { return fallback; }
+  }
+  return (v && typeof v === 'object') ? v : fallback;
+}
+
+async function saveSetting(key, obj) {
+  const payload = typeof obj === 'string' ? obj : JSON.stringify(obj);
+  const existing = await SystemSetting.findOne({ where: { key } });
+  if (existing) {
+    existing.value = payload;
+    await existing.save();
+    return existing;
+  }
+  return SystemSetting.create({ key, value: payload });
+}
+
 router.use(authenticate);
 router.use(authorize('admin'));
 
@@ -195,20 +222,20 @@ router.get('/settings/fare', asyncHandler(async (req, res) => {
     peak_hours: [{ start: 8, end: 10 }, { start: 17, end: 20 }],
     cancellation_fee_customer: 10
   };
-  return success(res, { fare_rates: { ...defaults, ...(s?.value||{}) } });
+  return success(res, { fare_rates: { ...defaults, ...parseSetting(s, {}) } });
 }));
 router.put('/settings/fare', asyncHandler(async (req, res) => {
-  const existing = (await SystemSetting.findOne({ where: { key: 'fare_rates' } }))?.value||{};
-  await SystemSetting.upsert({ key: 'fare_rates', value: { ...existing, ...req.body }, category: 'pricing' });
+  const existing = parseSetting(await SystemSetting.findOne({ where: { key: 'fare_rates' } }), {});
+  await saveSetting('fare_rates', { ...existing, ...req.body });
   return success(res, null, 'Fare updated');
 }));
 router.get('/settings/registration-fee', asyncHandler(async (req, res) => {
   const s = await SystemSetting.findOne({ where: { key: 'registration_fee' } });
-  return success(res, { registration_fee: s?.value||{} });
+  return success(res, { registration_fee: parseSetting(s, {}) });
 }));
 router.put('/settings/registration-fee', asyncHandler(async (req, res) => {
   const v = { standard: req.body.standard||999, promotional: req.body.promotional||499, promotion_active: req.body.promotion_active!==undefined ? req.body.promotion_active : true };
-  await SystemSetting.upsert({ key: 'registration_fee', value: v, category: 'drivers' });
+  await saveSetting('registration_fee', v);
   return success(res, { registration_fee: v }, 'Updated');
 }));
 // ---------------------------------------------------------------------------
@@ -318,10 +345,11 @@ router.post('/commission/adjust/:driverId', asyncHandler(async (req, res) => {
 
 router.get('/settings/commission', asyncHandler(async (req, res) => {
   const s = await SystemSetting.findOne({ where: { key: 'commission' } });
-  return success(res, { commission: s?.value||{ rate: 10, type: 'percentage' } });
+  return success(res, { commission: parseSetting(s, { rate: 10, block_threshold: 20 }) });
 }));
 router.put('/settings/commission', asyncHandler(async (req, res) => {
-  await SystemSetting.upsert({ key: 'commission', value: req.body, category: 'pricing' });
+  const cur = parseSetting(await SystemSetting.findOne({ where: { key: 'commission' } }), {});
+  await saveSetting('commission', { ...cur, ...req.body });
   return success(res, null, 'Updated');
 }));
 
@@ -506,7 +534,7 @@ router.get('/settings/fast2sms', asyncHandler(async (req, res) => {
 }));
 router.put('/settings/fast2sms', asyncHandler(async (req, res) => {
   if (!req.body.api_key || req.body.api_key.length < 10) throw new ApiError(400, 'Invalid API key');
-  await SystemSetting.upsert({ key: 'fast2sms_api_key', value: req.body.api_key, category: 'sms' });
+  await saveSetting('fast2sms_api_key', String(req.body.api_key || ''));
   return success(res, null, 'Fast2SMS API key saved! SMS OTP will now be sent.');
 }));
 
