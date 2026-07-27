@@ -14,6 +14,7 @@ import SettingsPage from './pages/SettingsPage';
 import PromoCodesPage from './pages/PromoCodesPage';
 import ReportsPage from './pages/ReportsPage';
 import NotificationsPage from './pages/NotificationsPage';
+import CommissionPage from './pages/CommissionPage';
 
 const theme = createTheme({
   palette: { primary: { main: '#6C63FF' }, secondary: { main: '#00D9A6' }, background: { default: '#F5F6FA' } },
@@ -32,6 +33,7 @@ function Layout() {
     { text: 'Customers', icon: <PeopleAlt />, path: '/customers' },
     { text: 'Rides', icon: <DirectionsCar />, path: '/rides' },
     { text: 'Support', icon: <Badge badgeContent="!" color="error"><SupportAgent /></Badge>, path: '/support' },
+    { text: 'Commission', icon: <MonetizationOn />, path: '/commission' },
     { text: 'Promo Codes', icon: <CardGiftcard />, path: '/promo-codes' },
     { text: 'Notifications', icon: <Notifications />, path: '/notifications' },
     { text: 'Reports', icon: <Download />, path: '/reports' },
@@ -65,6 +67,7 @@ function Layout() {
           <Route path="/customers/:id" element={<CustomerDetailPage />} />
           <Route path="/rides" element={<RidesPage />} />
           <Route path="/support" element={<SupportPage />} />
+          <Route path="/commission" element={<CommissionPage />} />
           <Route path="/promo-codes" element={<PromoCodesPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />

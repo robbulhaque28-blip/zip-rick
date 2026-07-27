@@ -31,6 +31,7 @@ const SystemSetting = require('./SystemSetting');
 const AuditLog = require('./AuditLog');
 const ChatMessage = require('./ChatMessage');
 const EmergencyContact = require('./EmergencyContact');
+const CommissionPayment = require('./CommissionPayment');
 
 // ============================
 // Association Definitions
@@ -51,6 +52,10 @@ DriverDocument.belongsTo(Driver, { foreignKey: 'driver_id', as: 'driver' });
 // Driver -> RegistrationPayments (1:N)
 Driver.hasMany(DriverRegistrationPayment, { foreignKey: 'driver_id', as: 'registrationPayments' });
 DriverRegistrationPayment.belongsTo(Driver, { foreignKey: 'driver_id', as: 'driver' });
+
+// Commission settlements submitted by drivers
+Driver.hasMany(CommissionPayment, { foreignKey: 'driver_id', as: 'commissionPayments' });
+CommissionPayment.belongsTo(Driver, { foreignKey: 'driver_id', as: 'driver' });
 
 // Driver -> Vehicle (1:1)
 Driver.hasOne(Vehicle, { foreignKey: 'driver_id', as: 'vehicle' });
@@ -173,6 +178,7 @@ const db = {
   AuditLog,
   ChatMessage,
   EmergencyContact,
+  CommissionPayment,
 };
 
 logger.info(`Loaded ${Object.keys(db).length - 2} database models`);

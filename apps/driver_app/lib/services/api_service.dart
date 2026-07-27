@@ -85,4 +85,23 @@ class ApiService {
   static Future<Map<String, dynamic>> sendSOS(double lat, double lng) => post('/sos', {'latitude': lat, 'longitude': lng, 'type': 'driver'});
   static Future<Map<String, dynamic>> payRegistrationFee({int amount = 499}) => post('/drivers/registration/pay', {'amount': amount});
   static Future<Map<String, dynamic>> updateFCMToken(String token) => post('/auth/update-fcm', {'fcm_token': token});
+
+  // ---- Commission ----
+  static Future<Map<String, dynamic>> getCommissionDue() => get('/drivers/commission/due');
+
+  static Future<Map<String, dynamic>> getCommissionPayments() => get('/drivers/commission/payments');
+
+  /// Reports a payment made outside the app (UPI / bank transfer). The dues
+  /// only clear after an admin confirms the money actually arrived.
+  static Future<Map<String, dynamic>> submitCommissionPayment({
+    required double amount,
+    String method = 'upi',
+    String reference = '',
+    String note = '',
+  }) => post('/drivers/commission/pay', {
+        'amount': amount,
+        'method': method,
+        'reference': reference,
+        'note': note,
+      });
 }

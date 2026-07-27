@@ -211,6 +211,111 @@ router.put('/settings/registration-fee', asyncHandler(async (req, res) => {
   await SystemSetting.upsert({ key: 'registration_fee', value: v, category: 'drivers' });
   return success(res, { registration_fee: v }, 'Updated');
 }));
+// ---------------------------------------------------------------------------
+// Commission settlements
+// ---------------------------------------------------------------------------
+
+// All settlements, newest first. ?status=pending to see what needs reviewing.
+router.get('/commission/payments', asyncHandler(async (req, res) => {
+  const { CommissionPayment } = require('../models');
+  const where = {};
+  if (req.query.status) where.status = req.query.status;
+  const rows = await CommissionPayment.findAll({
+    where,
+    include: [{
+      association: 'driver',
+      include: [{ association: 'user', attributes: ['full_name', 'phone'] }],
+    }],
+    order: [['created_at', 'DESC']],
+    limit: parseInt(req.query.limit) || 100,
+  });
+  return success(res, { payments: rows }, 'Commission payments');
+}));
+
+// Who currently owes money.
+router.get('/commission/outstanding', asyncHandler(async (req, res) => {
+  const drivers = await Driver.findAll({
+    where: { commission_due: { [Op.gt]: 0 } },
+    include: [{ association: 'user', attributes: ['full_name', 'phone'] }],
+    order: [['commission_due', 'DESC']],
+    limit: 200,
+  });
+  const total = drivers.reduce((sum, d) => sum + parseFloat(d.commission_due || 0), 0);
+  return success(res, {
+    total_outstanding: parseFloat(total.toFixed(2)),
+    drivers: drivers.map(d => ({
+      driver_id: d.id,
+      name: d.user?.full_name || null,
+      phone: d.user?.phone || null,
+      commission_due: parseFloat(d.commission_due || 0),
+      total_earnings: parseFloat(d.total_earnings || 0),
+      total_commission_paid: parseFloat(d.total_commission_paid || 0),
+      is_online: d.is_online,
+    })),
+  }, 'Outstanding commission');
+}));
+
+// Confirm the money actually arrived. THIS is what clears the driver's dues.
+router.post('/commission/payments/:id/confirm', asyncHandler(async (req, res) => {
+  const { CommissionPayment } = require('../models');
+  const payment = await CommissionPayment.findByPk(req.params.id);
+  if (!payment) throw new ApiError(404, 'Payment not found');
+  if (payment.status !== 'pending') throw new ApiError(400, 'This payment was already ' + payment.status);
+
+  const driver = await Driver.findByPk(payment.driver_id);
+  if (!driver) throw new ApiError(404, 'Driver not found');
+
+  const amount = parseFloat(payment.amount);
+  const due = parseFloat(driver.commission_due || 0);
+  // Never let the balance go negative if dues changed after submission.
+  const applied = Math.min(amount, due);
+
+  driver.commission_due = parseFloat((due - applied).toFixed(2));
+  driver.total_commission_paid = parseFloat(
+    (parseFloat(driver.total_commission_paid || 0) + applied).toFixed(2)
+  );
+  await driver.save();
+
+  payment.status = 'confirmed';
+  payment.reviewed_at = new Date();
+  payment.reviewed_by = req.userId;
+  await payment.save();
+
+  return success(res, {
+    payment,
+    commission_due: driver.commission_due,
+    total_commission_paid: driver.total_commission_paid,
+  }, 'Payment confirmed');
+}));
+
+// Reject a claimed payment that never arrived. Dues stay untouched.
+router.post('/commission/payments/:id/reject', asyncHandler(async (req, res) => {
+  const { CommissionPayment } = require('../models');
+  const payment = await CommissionPayment.findByPk(req.params.id);
+  if (!payment) throw new ApiError(404, 'Payment not found');
+  if (payment.status !== 'pending') throw new ApiError(400, 'This payment was already ' + payment.status);
+
+  payment.status = 'rejected';
+  payment.rejection_reason = (req.body.reason || 'Payment not received').toString();
+  payment.reviewed_at = new Date();
+  payment.reviewed_by = req.userId;
+  await payment.save();
+
+  return success(res, { payment }, 'Payment rejected');
+}));
+
+// Manually adjust a driver's dues (corrections, waivers, offline settlement).
+router.post('/commission/adjust/:driverId', asyncHandler(async (req, res) => {
+  const driver = await Driver.findByPk(req.params.driverId);
+  if (!driver) throw new ApiError(404, 'Driver not found');
+  const amount = parseFloat(req.body.amount);
+  if (!Number.isFinite(amount)) throw new ApiError(400, 'A numeric amount is required');
+  const next = parseFloat(driver.commission_due || 0) + amount;
+  driver.commission_due = parseFloat(Math.max(0, next).toFixed(2));
+  await driver.save();
+  return success(res, { commission_due: driver.commission_due }, 'Commission adjusted');
+}));
+
 router.get('/settings/commission', asyncHandler(async (req, res) => {
   const s = await SystemSetting.findOne({ where: { key: 'commission' } });
   return success(res, { commission: s?.value||{ rate: 10, type: 'percentage' } });

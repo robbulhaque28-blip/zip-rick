@@ -249,10 +249,41 @@ async function customerRoom(ride) {
           changed_by: 'driver', changed_by_id: userId,
         });
 
-        await Driver.update(
-          { is_available: true, current_ride_id: null },
-          { where: { id: ride.driver_id } }
-        );
+        // Accrue earnings and commission.
+        //
+        // Nothing used to do this: total_earnings, total_rides and
+        // commission_due all stayed at 0 forever no matter how many rides
+        // were completed, so the commission system could never trigger.
+        // PaymentService._processEarnings() was written for this but is dead
+        // code - nothing in the codebase ever calls it - and it ASSIGNS
+        // total_earnings instead of adding to it, which would wipe the
+        // running total on every ride.
+        //
+        // Literal increments keep this atomic, so two concurrent completions
+        // cannot clobber each other.
+        try {
+          const seq = require('sequelize');
+          const earned = parseFloat(ride.driver_earnings || 0);
+          const commission = parseFloat(ride.commission_amount || 0);
+          await Driver.update(
+            {
+              is_available: true,
+              current_ride_id: null,
+              total_rides: seq.literal('total_rides + 1'),
+              total_earnings: seq.literal('total_earnings + ' + earned),
+              commission_due: seq.literal('commission_due + ' + commission),
+            },
+            { where: { id: ride.driver_id } }
+          );
+          logger.info('Ride ' + ride.ride_number + ': driver credited ' + earned + ', commission due +' + commission);
+        } catch (e) {
+          logger.error('Earnings accrual failed for ride ' + ride.ride_number + ': ' + e.message);
+          // Never leave the driver stuck on a finished ride.
+          await Driver.update(
+            { is_available: true, current_ride_id: null },
+            { where: { id: ride.driver_id } }
+          );
+        }
 
         const room = await customerRoom(ride);
         if (room) io.to(room).emit('ride:completed', {

@@ -7,6 +7,8 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../widgets/chat_bottom_sheet.dart';
+import 'ride_map_page.dart';
+import 'commission_page.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_widgets.dart';
 
@@ -31,7 +33,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   final _chatStreamCtrl = StreamController<Map<String, dynamic>>.broadcast();
 
   @override
-  void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); _fetchLocation(); _connectSocket(); _loadProfile(); }
+  void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); _fetchLocation(); _connectSocket(); _loadProfile(); _loadCommission(); }
   @override
   void dispose() { WidgetsBinding.instance.removeObserver(this); _pollTimer?.cancel(); _posSub?.cancel(); _socket?.disconnect(); _socket?.dispose(); super.dispose(); }
 
@@ -221,8 +223,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
     } catch (e) {
       if (!mounted) return;
       setState(() => _togglingOnline = false);
+      final msg = e.toString().replaceFirst("Exception: ", "");
+      // The server refuses to bring a driver online while commission is owed.
+      if (msg.toLowerCase().contains('commission')) {
+        _loadCommission();
+        _showCommissionBlockedDialog(msg);
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(e.toString().replaceFirst("Exception: ", "")),
+        content: Text(msg),
         duration: const Duration(seconds: 5)));
     }
   }
@@ -360,6 +369,61 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
     );
   }
 
+  void _openRideMap() {
+    if (_activeRide == null) return;
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => RideMapPage(ride: Map<String, dynamic>.from(_activeRide!)),
+    ));
+  }
+
+  double _commissionDue = 0;
+  bool _commissionBlocked = false;
+
+  Future<void> _loadCommission() async {
+    try {
+      final r = await ApiService.getCommissionDue();
+      final d = r['data'] ?? {};
+      if (!mounted) return;
+      setState(() {
+        _commissionDue = double.tryParse('${d['commission_due'] ?? 0}') ?? 0;
+        _commissionBlocked = d['is_blocked'] == true;
+      });
+    } catch (_) {}
+  }
+
+  void _openCommission() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const CommissionPage()))
+        .then((_) => _loadCommission());
+  }
+
+  /// Shown when the server refuses to bring the driver online because they
+  /// are still holding the platform's cash commission.
+  void _showCommissionBlockedDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(children: [
+          const Icon(Icons.block_rounded, color: AppColors.danger, size: 21),
+          const SizedBox(width: 9),
+          Expanded(child: Text('Commission due', style: AppText.h3)),
+        ]),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(message, style: AppText.body.copyWith(fontSize: 13.5)),
+          const SizedBox(height: 10),
+          Text('Pay what you owe to start accepting rides again.',
+              style: AppText.label.copyWith(fontSize: 12)),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Later')),
+          ElevatedButton(
+            onPressed: () { Navigator.pop(ctx); _openCommission(); },
+            child: const Text('Pay now'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _callCustomer() async {
     String? p; try { p = _activeRide?['customer']?['user']?['phone']; } catch (_) {}
     if (p != null && p.isNotEmpty) { if (await canLaunchUrl(Uri.parse('tel:$p'))) await launchUrl(Uri.parse('tel:$p')); }
@@ -435,7 +499,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         child: Row(children: [
           _NavItem(icon: Icons.explore_rounded, label: 'Home', active: _bottomNavIndex == 0, onTap: () => setState(() => _bottomNavIndex = 0)),
-          _NavItem(icon: Icons.account_balance_wallet_rounded, label: 'Earnings', active: _bottomNavIndex == 1, onTap: () => setState(() => _bottomNavIndex = 1)),
+          _NavItem(icon: Icons.account_balance_wallet_rounded, label: 'Earnings', active: _bottomNavIndex == 1, onTap: () { setState(() => _bottomNavIndex = 1); _loadCommission(); }),
           _NavItem(icon: Icons.person_rounded, label: 'Profile', active: _bottomNavIndex == 2, onTap: () => setState(() => _bottomNavIndex = 2)),
         ]),
       )),
@@ -605,9 +669,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
         to: r['drop_address'] ?? 'Drop',
       )),
       const SizedBox(height: 16),
+      if (status == 'started') ...[
+        VybeButton(label: 'View route on map', icon: Icons.map_rounded, onPressed: _openRideMap),
+        const SizedBox(height: 11),
+      ],
       if (status == 'driver_assigned') VybeButton(label: "I've arrived", icon: Icons.check_circle_rounded, color: AppColors.warning, onPressed: () => _updateStatus('ride:arrived')),
       if (status == 'driver_arrived') VybeButton(label: 'Enter OTP to start', icon: Icons.lock_open_rounded, color: AppColors.success, onPressed: _showOtpDialog),
-      if (status == 'started') VybeButton(label: 'Complete ride', icon: Icons.flag_rounded, onPressed: () => _updateStatus('ride:complete')),
+      if (status == 'started') VybeButton(label: 'Complete ride', icon: Icons.flag_rounded, color: AppColors.success, onPressed: () => _updateStatus('ride:complete')),
       if (status == 'completed') VybeButton(label: 'Done', icon: Icons.home_rounded, color: AppColors.success, onPressed: () => setState(() { _hasActiveRide = false; _activeRide = null; })),
       const SizedBox(height: 11),
       Row(children: [
@@ -622,6 +690,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
           label: Text('Call', style: AppText.button.copyWith(fontSize: 13.5)),
           style: OutlinedButton.styleFrom(foregroundColor: AppColors.success, side: BorderSide(color: AppColors.success.withOpacity(0.35)))))),
       ]),
+      if (status != 'started' && status != 'completed') ...[
+        const SizedBox(height: 10),
+        SizedBox(height: 48, child: OutlinedButton.icon(
+          onPressed: _openRideMap,
+          icon: const Icon(Icons.map_rounded, size: 16),
+          label: Text('View route on map', style: AppText.button.copyWith(fontSize: 13.5)),
+        )),
+      ],
     ]);
   }
 
@@ -679,6 +755,59 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   }
 
   // EARNINGS TAB
+  /// Commission owed to Vybe. Fares are cash, so the driver is holding the
+  /// platform's share until they settle it.
+  Widget _commissionTile() {
+    final clear = _commissionDue <= 0;
+    final color = clear
+        ? AppColors.success
+        : (_commissionBlocked ? AppColors.danger : AppColors.warning);
+    return GestureDetector(
+      onTap: _openCommission,
+      child: Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: clear ? AppColors.surface : color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: clear ? AppColors.line : color.withOpacity(0.3)),
+          boxShadow: clear ? AppShadow.soft : null,
+        ),
+        child: Row(children: [
+          Container(
+            width: 42, height: 42,
+            decoration: BoxDecoration(color: color.withOpacity(0.14), borderRadius: BorderRadius.circular(13)),
+            child: Icon(
+              clear ? Icons.check_circle_rounded : Icons.account_balance_wallet_rounded,
+              color: color, size: 20),
+          ),
+          const SizedBox(width: 13),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Commission', style: AppText.bodyStrong.copyWith(fontSize: 13.5)),
+            const SizedBox(height: 2),
+            Text(
+              clear
+                  ? 'Nothing due. You are all clear.'
+                  : (_commissionBlocked
+                      ? 'Rs ${_commissionDue.toStringAsFixed(0)} due - you cannot go online'
+                      : 'Rs ${_commissionDue.toStringAsFixed(0)} due'),
+              style: AppText.label.copyWith(fontSize: 12, color: clear ? AppColors.muted : color),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ])),
+          if (!clear)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(AppRadius.sm)),
+              child: Text('Pay', style: AppText.button.copyWith(fontSize: 12.5, color: Colors.white)),
+            )
+          else
+            const Icon(Icons.chevron_right_rounded, color: AppColors.muted, size: 20),
+        ]),
+      ),
+    );
+  }
+
   Widget _earningsTab() => FutureBuilder<Map<String, dynamic>>(
     future: ApiService.getEarnings(),
     builder: (c, s) {
@@ -715,6 +844,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
           const SizedBox(width: 11),
           Expanded(child: _EarnCard(label: 'This week', value: 'Rs ${d['week_earnings'] ?? '0'}', icon: Icons.date_range_rounded, color: AppColors.warning)),
         ])),
+        const SizedBox(height: 12),
+        VybeFadeIn(delayMs: 90, child: _commissionTile()),
         if (daily.isNotEmpty) ...[
           const SizedBox(height: 12),
           VybeFadeIn(delayMs: 110, child: VybeCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

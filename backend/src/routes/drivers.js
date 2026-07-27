@@ -2,7 +2,30 @@ const router = require("express").Router();
 const { authenticate, authorize } = require("../middleware/auth");
 const { asyncHandler, ApiError } = require("../middleware/errorHandler");
 const { success, paginated } = require("../utils/response");
-const { Driver, DriverDocument, Vehicle, Ride, Customer } = require("../models");
+const { Driver, DriverDocument, Vehicle, Ride, Customer, CommissionPayment, SystemSetting } = require("../models");
+
+// Commission settings live in system_settings so an admin can change the
+// threshold and the payout account without a redeploy.
+const COMMISSION_DEFAULTS = {
+  rate: 10,
+  block_threshold: 20,
+  upi_id: "",
+  bank_account_name: "",
+  bank_account_number: "",
+  bank_ifsc: "",
+  instructions: "Pay your pending commission to the account above, then submit the reference number below.",
+};
+
+async function getCommissionSettings() {
+  try {
+    const row = await SystemSetting.findOne({ where: { key: "commission" } });
+    let v = row ? row.value : null;
+    if (typeof v === "string") { try { v = JSON.parse(v); } catch (e) { v = null; } }
+    return Object.assign({}, COMMISSION_DEFAULTS, v || {});
+  } catch (e) {
+    return Object.assign({}, COMMISSION_DEFAULTS);
+  }
+}
 
 router.use(authenticate);
 router.use(authorize("driver", "admin"));
@@ -52,29 +75,102 @@ router.post("/vehicle", asyncHandler(async (req, res) => {
   return success(res, { vehicle: v }, "Vehicle saved");
 }));
 
-// Get driver commission due
+// What the driver owes, plus where to pay it.
 router.get("/commission/due", asyncHandler(async (req, res) => {
   const driver = await Driver.findOne({ where: { user_id: req.userId } });
   if (!driver) throw new ApiError(404, "Driver not found");
+
+  const settings = await getCommissionSettings();
+  const due = parseFloat(driver.commission_due || 0);
+  const threshold = parseFloat(settings.block_threshold || 0);
+
+  // A submitted-but-unconfirmed payment should not be submitted twice.
+  const pending = await CommissionPayment.findOne({
+    where: { driver_id: driver.id, status: "pending" },
+    order: [["created_at", "DESC"]],
+  });
+
   return success(res, {
-    commission_due: parseFloat(driver.commission_due || 0),
+    commission_due: due,
     total_earnings: parseFloat(driver.total_earnings || 0),
     total_commission_paid: parseFloat(driver.total_commission_paid || 0),
+    commission_rate: parseFloat(driver.commission_rate || settings.rate || 10),
+    block_threshold: threshold,
+    is_blocked: due >= threshold && threshold > 0,
+    pending_payment: pending
+      ? {
+          id: pending.id,
+          amount: parseFloat(pending.amount),
+          method: pending.method,
+          reference: pending.reference,
+          submitted_at: pending.submitted_at,
+        }
+      : null,
+    payout: {
+      upi_id: settings.upi_id || "",
+      bank_account_name: settings.bank_account_name || "",
+      bank_account_number: settings.bank_account_number || "",
+      bank_ifsc: settings.bank_ifsc || "",
+      instructions: settings.instructions || "",
+    },
   }, "Commission due");
 }));
 
-// Pay commission (settle dues)
+// Driver's own settlement history.
+router.get("/commission/payments", asyncHandler(async (req, res) => {
+  const driver = await Driver.findOne({ where: { user_id: req.userId } });
+  if (!driver) throw new ApiError(404, "Driver not found");
+  const rows = await CommissionPayment.findAll({
+    where: { driver_id: driver.id },
+    order: [["created_at", "DESC"]],
+    limit: 50,
+  });
+  return success(res, { payments: rows }, "Commission payments");
+}));
+
+// Submit a commission payment for admin confirmation.
+//
+// Fares are cash, so the money moves OUTSIDE the app (UPI or bank transfer).
+// The driver reports what they sent; an admin verifies it actually arrived
+// before the balance clears. The old version let a driver zero their own
+// dues with a single unauthenticated-by-anything POST - no money required.
 router.post("/commission/pay", asyncHandler(async (req, res) => {
   const driver = await Driver.findOne({ where: { user_id: req.userId } });
   if (!driver) throw new ApiError(404, "Driver not found");
-  const { amount } = req.body;
+
   const due = parseFloat(driver.commission_due || 0);
-  if (!amount || amount <= 0) throw new ApiError(400, "Invalid amount");
-  if (amount > due) throw new ApiError(400, "Amount exceeds due");
-  driver.commission_due = parseFloat((due - amount).toFixed(2));
-  driver.total_commission_paid = parseFloat((parseFloat(driver.total_commission_paid || 0) + amount).toFixed(2));
-  await driver.save();
-  return success(res, { commission_due: driver.commission_due, total_commission_paid: driver.total_commission_paid }, "Commission paid");
+  if (due <= 0) throw new ApiError(400, "You have no commission due");
+
+  const existing = await CommissionPayment.findOne({
+    where: { driver_id: driver.id, status: "pending" },
+  });
+  if (existing) {
+    throw new ApiError(409, "You already have a payment awaiting confirmation");
+  }
+
+  const amount = parseFloat(req.body.amount != null ? req.body.amount : due);
+  if (!Number.isFinite(amount) || amount <= 0) throw new ApiError(400, "Invalid amount");
+  if (amount > due + 0.01) throw new ApiError(400, "Amount exceeds what you owe");
+
+  const method = ["upi", "bank_transfer", "cash"].includes(req.body.method)
+    ? req.body.method
+    : "upi";
+
+  const payment = await CommissionPayment.create({
+    driver_id: driver.id,
+    amount: parseFloat(amount.toFixed(2)),
+    method,
+    reference: (req.body.reference || "").toString().trim() || null,
+    note: (req.body.note || "").toString().trim() || null,
+    status: "pending",
+    submitted_at: new Date(),
+  });
+
+  return success(res, {
+    payment,
+    commission_due: due,
+    message: "Submitted. Your dues clear once we confirm the payment.",
+  }, "Payment submitted for confirmation");
 }));
 
 router.get("/earnings", asyncHandler(async (req, res) => {
@@ -108,6 +204,25 @@ router.post("/toggle-online", asyncHandler(async (req, res) => {
   const goingOnline = (req.body && typeof req.body.is_online === "boolean")
     ? req.body.is_online
     : !driver.is_online;
+
+  // Commission gate. Enforced HERE, on the server, not just in the app - the
+  // old check lived only in the Flutter client, so a modified build could
+  // simply skip it and go online owing money.
+  if (goingOnline) {
+    const settings = await getCommissionSettings();
+    const threshold = parseFloat(settings.block_threshold || 0);
+    const due = parseFloat(driver.commission_due || 0);
+    if (threshold > 0 && due >= threshold) {
+      // errorHandler strips `details` in production, so the amount owed goes
+      // in the message and a distinct code lets the app react specifically.
+      throw new ApiError(
+        402,
+        "Pay your pending commission of Rs " + due.toFixed(0) + " to go online.",
+        "COMMISSION_DUE",
+        { commission_due: due, block_threshold: threshold }
+      );
+    }
+  }
 
   if (goingOnline) {
     const lat = parseFloat(req.body?.latitude);
