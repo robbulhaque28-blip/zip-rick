@@ -275,6 +275,27 @@ async function customerRoom(ride) {
             },
             { where: { id: ride.driver_id } }
           );
+          // Record the payment so admin revenue reporting has something to
+          // sum. Nothing created Payment rows before - PaymentService is dead
+          // code - so the dashboard always showed Rs 0 revenue no matter how
+          // many rides completed.
+          try {
+            const { Payment } = require('../models');
+            const existing = await Payment.findOne({ where: { ride_id: ride.id } });
+            if (!existing) {
+              await Payment.create({
+                ride_id: ride.id,
+                customer_id: ride.customer_id,
+                driver_id: ride.driver_id,
+                amount: parseFloat(ride.total_fare || 0),
+                payment_method: ride.payment_method || 'cash',
+                status: 'completed',
+              });
+            }
+          } catch (payErr) {
+            logger.error('Payment record failed for ' + ride.ride_number + ': ' + payErr.message);
+          }
+
           logger.info('Ride ' + ride.ride_number + ': driver credited ' + earned + ', commission due +' + commission);
         } catch (e) {
           logger.error('Earnings accrual failed for ride ' + ride.ride_number + ': ' + e.message);

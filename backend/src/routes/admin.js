@@ -55,8 +55,11 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
     let trev = 0;
     let trevToday = 0;
     try {
-      trev = await Payment.sum('amount', { where: { payment_status: 'completed' } }) || 0;
-      trevToday = await Payment.sum('amount', { where: { payment_status: 'completed', paid_at: { [Op.gte]: today } } }) || 0;
+      // Payment model columns are `status` and `created_at`. The old code
+      // queried `payment_status` / `paid_at`, which do not exist - the query
+      // threw and the catch below silently reported Rs 0 revenue.
+      trev = await Payment.sum('amount', { where: { status: 'completed' } }) || 0;
+      trevToday = await Payment.sum('amount', { where: { status: 'completed', created_at: { [Op.gte]: today } } }) || 0;
     } catch (e) {
       trev = await Payment.sum('amount') || 0;
       trevToday = 0;
@@ -238,6 +241,91 @@ router.put('/settings/registration-fee', asyncHandler(async (req, res) => {
   await saveSetting('registration_fee', v);
   return success(res, { registration_fee: v }, 'Updated');
 }));
+// ---------------------------------------------------------------------------
+// Backfill earnings for rides completed BEFORE the accrual code existed.
+//
+// Until the commission system shipped, completing a ride only changed its
+// status - it never touched total_earnings, total_rides or commission_due,
+// and never created a Payment row. Historic rides therefore show correct
+// per-ride figures while every driver total reads 0.
+//
+// This recomputes those totals from the rides table itself, so it is safe to
+// run more than once: it always rebuilds from source data rather than adding
+// to whatever is already there.
+// ---------------------------------------------------------------------------
+router.post('/backfill-earnings', asyncHandler(async (req, res) => {
+  const { Payment } = require('../models');
+
+  const completed = await Ride.findAll({
+    where: { status: 'completed' },
+    attributes: ['id', 'ride_number', 'customer_id', 'driver_id', 'total_fare',
+                 'driver_earnings', 'commission_amount', 'payment_method', 'ride_completed_at'],
+  });
+
+  // Rebuild each driver's totals from their completed rides.
+  const byDriver = {};
+  for (const r of completed) {
+    if (!r.driver_id) continue;
+    if (!byDriver[r.driver_id]) byDriver[r.driver_id] = { rides: 0, earnings: 0, commission: 0 };
+    byDriver[r.driver_id].rides += 1;
+    byDriver[r.driver_id].earnings += parseFloat(r.driver_earnings || 0);
+    byDriver[r.driver_id].commission += parseFloat(r.commission_amount || 0);
+  }
+
+  const drivers = [];
+  for (const driverId of Object.keys(byDriver)) {
+    const d = await Driver.findByPk(driverId, { include: [{ association: 'user', attributes: ['full_name'] }] });
+    if (!d) continue;
+    const t = byDriver[driverId];
+
+    // Commission already settled stays settled - only the unpaid remainder
+    // becomes due, so a backfill never re-bills a driver.
+    const alreadyPaid = parseFloat(d.total_commission_paid || 0);
+    const stillDue = Math.max(0, parseFloat((t.commission - alreadyPaid).toFixed(2)));
+
+    d.total_rides = t.rides;
+    d.total_earnings = parseFloat(t.earnings.toFixed(2));
+    d.commission_due = stillDue;
+    await d.save();
+
+    drivers.push({
+      driver_id: d.id,
+      name: d.user?.full_name || null,
+      total_rides: d.total_rides,
+      total_earnings: parseFloat(d.total_earnings),
+      commission_earned: parseFloat(t.commission.toFixed(2)),
+      already_paid: alreadyPaid,
+      commission_due: stillDue,
+    });
+  }
+
+  // Create any missing Payment rows so revenue reporting has data.
+  let paymentsCreated = 0;
+  for (const r of completed) {
+    const existing = await Payment.findOne({ where: { ride_id: r.id } });
+    if (existing) continue;
+    try {
+      await Payment.create({
+        ride_id: r.id,
+        customer_id: r.customer_id,
+        driver_id: r.driver_id,
+        amount: parseFloat(r.total_fare || 0),
+        payment_method: r.payment_method || 'cash',
+        status: 'completed',
+        created_at: r.ride_completed_at || new Date(),
+      });
+      paymentsCreated++;
+    } catch (e) { /* skip rows that cannot be created */ }
+  }
+
+  return success(res, {
+    completed_rides: completed.length,
+    drivers_updated: drivers.length,
+    payments_created: paymentsCreated,
+    drivers,
+  }, 'Backfill complete');
+}));
+
 // ---------------------------------------------------------------------------
 // Commission settlements
 // ---------------------------------------------------------------------------
@@ -614,7 +702,7 @@ router.get('/reports-data/:type', asyncHandler(async (req, res) => {
         ride_number: p.ride?.ride_number || 'N/A',
         amount: p.amount || 0,
         method: p.payment_method || 'N/A',
-        status: p.payment_status || 'N/A',
+        status: p.status || 'N/A',
         date: p.created_at ? new Date(p.created_at).toLocaleDateString() : '',
       })),
     };
@@ -677,7 +765,7 @@ router.get('/reports-pdf/:type', asyncHandler(async (req, res) => {
     rows = `<h2>Total Revenue: ₹${total.toFixed(2)}</h2><h3>Transactions: ${payments.length}</h3>`;
     rows += '<table><tr><th>Ride #</th><th>Amount</th><th>Method</th><th>Status</th><th>Date</th></tr>';
     payments.forEach(p => {
-      rows += `<tr><td>${p.ride?.ride_number || 'N/A'}</td><td>₹${p.amount || 0}</td><td>${p.payment_method || 'N/A'}</td><td>${p.payment_status || 'N/A'}</td><td>${new Date(p.created_at).toLocaleDateString()}</td></tr>`;
+      rows += `<tr><td>${p.ride?.ride_number || 'N/A'}</td><td>₹${p.amount || 0}</td><td>${p.payment_method || 'N/A'}</td><td>${p.status || 'N/A'}</td><td>${new Date(p.created_at).toLocaleDateString()}</td></tr>`;
     });
     rows += '</table>';
   }
@@ -782,7 +870,7 @@ router.get('/reports/revenue', asyncHandler(async (req, res) => {
 
   let csv = 'Ride #,Amount,Method,Status,Date\n';
   payments.forEach(p => {
-    csv += `"${p.ride?.ride_number || 'N/A'}",${p.amount || 0},${p.payment_method || 'N/A'},${p.payment_status || 'N/A'},"${new Date(p.created_at).toLocaleDateString()}"\n`;
+    csv += `"${p.ride?.ride_number || 'N/A'}",${p.amount || 0},${p.payment_method || 'N/A'},${p.status || 'N/A'},"${new Date(p.created_at).toLocaleDateString()}"\n`;
   });
 
   res.setHeader('Content-Type', 'text/csv');
