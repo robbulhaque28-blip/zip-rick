@@ -72,3 +72,36 @@ coverage/
 .cache/
 
 apps/customer_app/ui_backup_*/
+
+# ---- One-off scripts and backups (untracked 2026-07-27) ----
+# Ad-hoc admin/test scripts. Kept on disk, out of the repo.
+backend/check_*.js
+backend/create_admin*.js
+backend/create_pending_driver.js
+backend/create_sample_data.js
+backend/test_*.js
+backend/approve_driver.js
+backend/get_customer_login.js
+backend/make_admin.js
+backend/*.cjs
+apps/*/*.cjs
+
+# Local SQLite scratch DB - production uses Postgres
+backend/database.sqlite
+*.sqlite
+*.sqlite3
+
+# Stray editor backups
+*.bak
+
+# Timestamped UI backup folders - git history serves this purpose
+apps/driver_app/ui_backup_*/
+apps/*/ui_backup_*/
+
+# Generated PowerShell installers and their backup folders
+install_*.ps1
+vybe_clean.ps1
+apps/*/install*.ps1
+backup_*/
+backend_backup_*/
+fix4_backup_*/
