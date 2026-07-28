@@ -5,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_widgets.dart';
 
@@ -24,19 +25,45 @@ class RideMapPage extends StatefulWidget {
 class _RideMapPageState extends State<RideMapPage> {
   final MapController _map = MapController();
   StreamSubscription<Position>? _posSub;
+  Timer? _rideTimer;
   LatLng? _me;
   bool _followMe = true;
   bool _ready = false;
+
+  /// Live copy of the ride.
+  ///
+  /// The page used to read widget.ride, which is a frozen snapshot taken when
+  /// the map opened. If the driver marked arrival or started the trip while
+  /// the map was still on screen, the status never changed here - so the map
+  /// kept navigating to the PICKUP even after the ride had started and the
+  /// driver should have been heading to the DROP.
+  late Map<String, dynamic> _ride = Map<String, dynamic>.from(widget.ride);
 
   @override
   void initState() {
     super.initState();
     _start();
+    // Keep the ride fresh so the map re-targets from pickup to drop the
+    // moment the trip actually starts.
+    _refreshRide();
+    _rideTimer = Timer.periodic(const Duration(seconds: 5), (_) => _refreshRide());
+  }
+
+  Future<void> _refreshRide() async {
+    try {
+      final r = await ApiService.getActiveRide();
+      final live = r['data']?['ride'];
+      if (!mounted || live == null) return;
+      // Only accept updates for the ride this map was opened for.
+      if (live['id']?.toString() != _ride['id']?.toString()) return;
+      setState(() => _ride = Map<String, dynamic>.from(live));
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _posSub?.cancel();
+    _rideTimer?.cancel();
     super.dispose();
   }
 
@@ -78,27 +105,27 @@ class _RideMapPageState extends State<RideMapPage> {
   }
 
   LatLng? get _pickup {
-    final la = _num(widget.ride['pickup_latitude']);
-    final lo = _num(widget.ride['pickup_longitude']);
+    final la = _num(_ride['pickup_latitude']);
+    final lo = _num(_ride['pickup_longitude']);
     if (la == null || lo == null) return null;
     return LatLng(la, lo);
   }
 
   LatLng? get _drop {
-    final la = _num(widget.ride['drop_latitude']);
-    final lo = _num(widget.ride['drop_longitude']);
+    final la = _num(_ride['drop_latitude']);
+    final lo = _num(_ride['drop_longitude']);
     if (la == null || lo == null) return null;
     return LatLng(la, lo);
   }
 
   /// The point the driver is currently heading towards.
   LatLng? get _target {
-    final status = (widget.ride['status'] ?? '').toString();
+    final status = (_ride['status'] ?? '').toString();
     if (status == 'started') return _drop ?? _pickup;
     return _pickup ?? _drop;
   }
 
-  bool get _goingToDrop => (widget.ride['status'] ?? '').toString() == 'started';
+  bool get _goingToDrop => (_ride['status'] ?? '').toString() == 'started';
 
   double _distanceKm(LatLng a, LatLng b) {
     const r = 6371.0;
@@ -384,8 +411,8 @@ class _RideMapPageState extends State<RideMapPage> {
                 ]),
                 const SizedBox(height: 14),
                 VybeRouteCard(
-                  from: (widget.ride['pickup_address'] ?? 'Pickup').toString(),
-                  to: (widget.ride['drop_address'] ?? 'Drop').toString(),
+                  from: (_ride['pickup_address'] ?? 'Pickup').toString(),
+                  to: (_ride['drop_address'] ?? 'Drop').toString(),
                 ),
                 const SizedBox(height: 14),
                 VybeButton(
