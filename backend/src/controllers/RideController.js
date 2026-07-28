@@ -133,7 +133,25 @@ module.exports = {
       await RideStatusLog.create({ ride_id: ride.id, previous_status: 'pending', new_status: 'searching', changed_by: 'system' });
       RideMatchingService.startSearch(ride, null, null);
     }
-    if (promoCodeId) { const { PromoRedemption, PromoCode } = require('../models'); await PromoRedemption.create({ promo_code_id: promoCodeId, user_id: req.userId, ride_id: ride.id, discount_amount: promoDiscount }); await PromoCode.increment('usage_count', { where: { id: promoCodeId } }); }
+    // Record the redemption. This used to write `user_id`, but the
+    // PromoRedemption table's column is `customer_id`, and it incremented
+    // `usage_count`, which does not exist on PromoCode at all - so booking
+    // with a VALID promo code always failed with a 400 validation error.
+    // Wrapped in try/catch: a bookkeeping failure must never lose a booking
+    // that has already been created.
+    if (promoCodeId) {
+      try {
+        const { PromoRedemption } = require('../models');
+        await PromoRedemption.create({
+          promo_code_id: promoCodeId,
+          customer_id: customer.id,
+          ride_id: ride.id,
+          discount_amount: promoDiscount,
+        });
+      } catch (promoErr) {
+        logger.error('Promo redemption record failed for ' + ride.ride_number + ': ' + promoErr.message);
+      }
+    }
     logger.info(`Ride ${ride.ride_number} booked`);
     return created(res, {
       ride: {
