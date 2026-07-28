@@ -181,9 +181,21 @@ module.exports = {
   }),
   getActiveRide: asyncHandler(async (req, res) => {
     const ACTIVE = ['searching', 'driver_assigned', 'driver_arrived', 'started'];
-    const includeBoth = [
+
+    // A driver must never receive the customer's personal phone number - it
+    // would let them contact the rider outside the platform, during or long
+    // after the trip. Drivers get the customer's first name only; the two
+    // parties communicate through in-app chat.
+    const forDriver = [
       { association: 'driver', include: [{ association: 'user', attributes: ['id', 'full_name', 'phone', 'avatar_url'] }, { association: 'vehicle' }] },
-      { association: 'customer', include: [{ association: 'user', attributes: ['id', 'full_name', 'phone', 'avatar_url'] }] },
+      { association: 'customer', include: [{ association: 'user', attributes: ['id', 'full_name', 'avatar_url'] }] },
+    ];
+
+    // The customer DOES get the driver's phone: they need to reach the driver
+    // at pickup, and the driver's number is already semi-public on the vehicle.
+    const forCustomer = [
+      { association: 'driver', include: [{ association: 'user', attributes: ['id', 'full_name', 'phone', 'avatar_url'] }, { association: 'vehicle' }] },
+      { association: 'customer', include: [{ association: 'user', attributes: ['id', 'full_name', 'avatar_url'] }] },
     ];
 
     // Driver: return the ride currently assigned to them.
@@ -191,7 +203,7 @@ module.exports = {
     if (driver) {
       const ride = await Ride.findOne({
         where: { driver_id: driver.id, status: { [Op.in]: ['driver_assigned', 'driver_arrived', 'started'] } },
-        include: includeBoth,
+        include: forDriver,
         order: [['created_at', 'DESC']]
       });
       return success(res, { ride }, ride ? 'Active ride' : 'No active ride');
@@ -202,7 +214,7 @@ module.exports = {
     if (!customer) return success(res, { ride: null }, 'No active ride');
     const ride = await Ride.findOne({
       where: { customer_id: customer.id, status: { [Op.in]: ACTIVE } },
-      include: includeBoth,
+      include: forCustomer,
       order: [['created_at', 'DESC']]
     });
     return success(res, { ride }, ride ? 'Active ride' : 'No active ride');

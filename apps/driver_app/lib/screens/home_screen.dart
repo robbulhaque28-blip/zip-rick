@@ -424,10 +424,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
     );
   }
 
-  Future<void> _callCustomer() async {
-    String? p; try { p = _activeRide?['customer']?['user']?['phone']; } catch (_) {}
-    if (p != null && p.isNotEmpty) { if (await canLaunchUrl(Uri.parse('tel:$p'))) await launchUrl(Uri.parse('tel:$p')); }
-    else if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone unavailable')));
+  /// Drivers deliberately cannot phone the customer.
+  ///
+  /// Handing a driver the rider's personal number lets them make contact
+  /// outside the platform, during the trip or long afterwards. The server no
+  /// longer sends it at all; use in-app chat instead, which is tied to the
+  /// ride and leaves an auditable record.
+  void _messageCustomer() {
+    _openChat();
   }
 
   Future<void> _sendSOS() async {
@@ -685,9 +689,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
           label: Text('Chat', style: AppText.button.copyWith(fontSize: 13.5))))),
         const SizedBox(width: 10),
         Expanded(child: SizedBox(height: 48, child: OutlinedButton.icon(
-          onPressed: _callCustomer,
-          icon: const Icon(Icons.call_rounded, size: 16),
-          label: Text('Call', style: AppText.button.copyWith(fontSize: 13.5)),
+          onPressed: _messageCustomer,
+          icon: const Icon(Icons.support_agent_rounded, size: 16),
+          label: Text('Contact', style: AppText.button.copyWith(fontSize: 13.5)),
           style: OutlinedButton.styleFrom(foregroundColor: AppColors.success, side: BorderSide(color: AppColors.success.withOpacity(0.35)))))),
       ]),
       if (status != 'started' && status != 'completed') ...[
