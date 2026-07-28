@@ -81,6 +81,48 @@ module.exports = {
       throw new ApiError(400, 'Unsupported ride type');
     }
 
+    // Safety net for placeholder addresses.
+    //
+    // Older app builds send "Current Location" and "Pinned", which tell the
+    // driver nothing about where to go. Resolve them server-side so every
+    // ride carries a real place name regardless of app version. Uses the
+    // free Nominatim service - no API key - and silently keeps the original
+    // text if the lookup fails, so a booking is never blocked.
+    const PLACEHOLDERS = ['current location', 'pinned', 'pinned location', 'locating...', ''];
+    const looksPlaceholder = (v) => PLACEHOLDERS.includes(String(v || '').trim().toLowerCase());
+
+    async function resolvePlaceName(la, lo, fallback) {
+      try {
+        const axios = require('axios');
+        const resp = await axios.get('https://nominatim.openstreetmap.org/reverse', {
+          params: { lat: la, lon: lo, format: 'json', zoom: 18, addressdetails: 1 },
+          headers: { 'User-Agent': 'Vybe/1.0 (support@vybe.app)' },
+          timeout: 6000,
+        });
+        const d = resp.data || {};
+        const a = d.address || {};
+        const parts = [];
+        if (d.name) parts.push(d.name);
+        for (const k of ['road', 'neighbourhood', 'suburb', 'village', 'town', 'city_district', 'city']) {
+          if (a[k] && !parts.includes(a[k])) parts.push(a[k]);
+          if (parts.length >= 3) break;
+        }
+        if (parts.length) return parts.join(', ');
+        return d.display_name || fallback;
+      } catch (e) {
+        return fallback;
+      }
+    }
+
+    let pickupAddress = req.body.pickup_address;
+    let dropAddress = req.body.drop_address;
+    if (looksPlaceholder(pickupAddress)) {
+      pickupAddress = await resolvePlaceName(pLat, pLng, pickupAddress || 'Pickup point');
+    }
+    if (looksPlaceholder(dropAddress)) {
+      dropAddress = await resolvePlaceName(dLat, dLng, dropAddress || 'Drop point');
+    }
+
     const route = await getRoute(pLat, pLng, dLat, dLng);
     const rideMode = req.body.ride_mode || 'single';
     // Always use the server-calculated route. Trusting req.body.route_distance
@@ -95,11 +137,11 @@ module.exports = {
       customer_id: customer.id,
       pickup_latitude: pLat,
       pickup_longitude: pLng,
-      pickup_address: req.body.pickup_address,
+      pickup_address: pickupAddress,
       pickup_place_id: req.body.pickup_place_id,
       drop_latitude: dLat,
       drop_longitude: dLng,
-      drop_address: req.body.drop_address,
+      drop_address: dropAddress,
       drop_place_id: req.body.drop_place_id,
       route_distance: route.distance_meters,
       route_duration: route.duration_seconds,

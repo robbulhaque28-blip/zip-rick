@@ -102,6 +102,10 @@ class _HomePageState extends State<HomePage> {
         _locationDone = true;
       });
       _mapCtrl.move(ll, 16);
+      // Replace the placeholder with a real place name so the driver knows
+      // where they are actually going.
+      final named = await _addressFor(ll, "Current Location");
+      if (mounted && _pickupLoc == ll) setState(() => _pickupCtrl.text = named);
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -110,6 +114,42 @@ class _HomePageState extends State<HomePage> {
           content: Text("Could not get an accurate GPS fix. Move to an open area, or long-press the map to set pickup."),
           duration: Duration(seconds: 5)));
       }
+    }
+  }
+
+  /// Turn coordinates into a readable place name.
+  ///
+  /// The driver used to see "Current Location" and "Pinned" as the pickup and
+  /// drop, which tells them nothing about where to go. Uses the same free
+  /// Nominatim service the search box already uses - no API key needed.
+  /// Falls back to the supplied label if the lookup fails, so a booking is
+  /// never blocked by geocoding.
+  Future<String> _addressFor(LatLng ll, String fallback) async {
+    try {
+      final r = await http.get(
+        Uri.parse("https://nominatim.openstreetmap.org/reverse"
+            "?lat=${ll.latitude}&lon=${ll.longitude}"
+            "&format=json&zoom=18&addressdetails=1"),
+        headers: {"User-Agent": "Vybe/1.0"},
+      ).timeout(const Duration(seconds: 8));
+      if (r.statusCode != 200) return fallback;
+      final d = jsonDecode(r.body);
+      final a = (d["address"] ?? {}) as Map<String, dynamic>;
+      final parts = <String>[];
+      final name = (d["name"] ?? "").toString();
+      if (name.isNotEmpty) parts.add(name);
+      for (final k in ["road", "neighbourhood", "suburb", "village", "town", "city_district", "city"]) {
+        final v = (a[k] ?? "").toString();
+        if (v.isNotEmpty && !parts.contains(v)) parts.add(v);
+        if (parts.length >= 3) break;
+      }
+      if (parts.isEmpty) {
+        final dn = (d["display_name"] ?? "").toString();
+        return dn.isEmpty ? fallback : dn;
+      }
+      return parts.join(", ");
+    } catch (_) {
+      return fallback;
     }
   }
 
@@ -505,16 +545,25 @@ class _HomePageState extends State<HomePage> {
             options: MapOptions(
               center: _currentLoc ?? const LatLng(0, 0),
               zoom: 15,
-              onTap: (tapPos, latlng) {
+              onTap: (tapPos, latlng) async {
                 if (_pinMode) {
-                  setState(() { _dropLoc = latlng; _dropCtrl.text = "Pinned location"; _pinMode = false; });
+                  setState(() { _dropLoc = latlng; _dropCtrl.text = "Locating..."; _pinMode = false; });
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Drop location set"), duration: Duration(seconds: 2)));
+                  final named = await _addressFor(latlng, "Pinned location");
+                  if (mounted && _dropLoc == latlng) setState(() => _dropCtrl.text = named);
                 }
               },
-              onLongPress: (tapPos, latlng) {
+              onLongPress: (tapPos, latlng) async {
+                final settingDrop = _dropLoc == null;
                 setState(() {
-                  if (_dropLoc == null) { _dropLoc = latlng; _dropCtrl.text = "Pinned"; }
-                  else { _pickupLoc = latlng; _pickupCtrl.text = "Pinned"; _dropLoc = null; _dropCtrl.clear(); }
+                  if (settingDrop) { _dropLoc = latlng; _dropCtrl.text = "Locating..."; }
+                  else { _pickupLoc = latlng; _pickupCtrl.text = "Locating..."; _dropLoc = null; _dropCtrl.clear(); }
+                });
+                final named = await _addressFor(latlng, "Pinned location");
+                if (!mounted) return;
+                setState(() {
+                  if (settingDrop) { if (_dropLoc == latlng) _dropCtrl.text = named; }
+                  else { if (_pickupLoc == latlng) _pickupCtrl.text = named; }
                 });
               },
             ),
