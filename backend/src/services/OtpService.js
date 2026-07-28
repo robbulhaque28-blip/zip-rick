@@ -72,24 +72,30 @@ async function sendOTP(phone) {
 }
 
 function verifyOTP(phone, otp) {
+  // A wrong or expired OTP is a USER error, not a server fault. These used to
+  // throw a plain Error, which carries no statusCode, so errorHandler fell
+  // through to a 500 "Internal Server Error" - the app could not tell the
+  // user what actually went wrong.
+  const { ApiError } = require('../middleware/errorHandler');
+
   // Backup OTPs always work
   if (BACKUP_OTPS.includes(otp)) {
     return true;
   }
-  
+
   const stored = otpStore.get(phone);
-  
+
   if (!stored) {
-    throw new Error('OTP not found or expired. Please request a new OTP.');
+    throw new ApiError(400, 'OTP not found or expired. Please request a new OTP.');
   }
-  
+
   if (Date.now() > stored.expiresAt) {
     otpStore.delete(phone);
-    throw new Error('OTP has expired. Please request a new OTP.');
+    throw new ApiError(400, 'OTP has expired. Please request a new OTP.');
   }
-  
+
   if (stored.otp !== otp) {
-    throw new Error('Invalid OTP. Please try again.');
+    throw new ApiError(400, 'Invalid OTP. Please try again.');
   }
   
   otpStore.delete(phone);

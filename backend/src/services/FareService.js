@@ -50,4 +50,53 @@ async function calculateFare(params) {
   };
 }
 
-module.exports = { calculateFare, getRates };
+/**
+ * Apply a promo code to a fare.
+ *
+ * RideController has always called FareService.applyPromo(), but this
+ * function never existed - so ANY request carrying a promo_code threw
+ * "FareService.applyPromo is not a function" and returned a 500. Both the
+ * fare estimate and the booking endpoint were affected, meaning promo codes
+ * have never worked at all.
+ *
+ * An unknown, inactive or expired code is NOT an error: it simply yields no
+ * discount, so a bad code can never block a booking.
+ */
+async function applyPromo(totalFare, code) {
+  const none = { discount: 0, promo_applied: false, promo_code_id: null };
+  try {
+    if (!code || typeof code !== 'string') return none;
+
+    const { PromoCode } = require('../models');
+    const promo = await PromoCode.findOne({ where: { code: code.trim().toUpperCase() } });
+    if (!promo) return none;
+
+    // 'status' is the column in this schema; treat anything not active as off.
+    if (promo.status && String(promo.status).toLowerCase() !== 'active') return none;
+
+    if (promo.expiry_date && new Date(promo.expiry_date) < new Date()) return none;
+
+    const fare = parseFloat(totalFare) || 0;
+    const value = parseFloat(promo.discount) || 0;
+    if (value <= 0) return none;
+
+    let discount;
+    if (String(promo.discount_type).toLowerCase() === 'percentage') {
+      discount = fare * (value / 100);
+    } else {
+      discount = value;
+    }
+
+    // Never discount below zero, and never more than the fare itself.
+    discount = Math.max(0, Math.min(discount, fare));
+    discount = parseFloat(discount.toFixed(2));
+    if (discount <= 0) return none;
+
+    return { discount, promo_applied: true, promo_code_id: promo.id };
+  } catch (e) {
+    // A promo lookup must never break a booking.
+    return none;
+  }
+}
+
+module.exports = { calculateFare, getRates, applyPromo };
