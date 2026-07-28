@@ -47,7 +47,41 @@ module.exports = {
   bookRide: asyncHandler(async (req, res) => {
     const customer = await Customer.findOne({ where: { user_id: req.userId } });
     if (!customer) throw new ApiError(404, 'Customer not found');
-    const route = await getRoute(req.body.pickup_latitude, req.body.pickup_longitude, req.body.drop_latitude, req.body.drop_longitude);
+
+    // Validate the request BEFORE touching routing or fares. Previously an
+    // out-of-range latitude or an unknown payment method fell through to a
+    // raw 500, and a booking whose pickup equalled its drop was accepted.
+    const pLat = parseFloat(req.body.pickup_latitude);
+    const pLng = parseFloat(req.body.pickup_longitude);
+    const dLat = parseFloat(req.body.drop_latitude);
+    const dLng = parseFloat(req.body.drop_longitude);
+
+    const validCoord = (la, lo) =>
+      Number.isFinite(la) && Number.isFinite(lo) &&
+      la >= -90 && la <= 90 && lo >= -180 && lo <= 180 &&
+      !(la === 0 && lo === 0);
+
+    if (!validCoord(pLat, pLng)) throw new ApiError(400, 'Please choose a valid pickup location');
+    if (!validCoord(dLat, dLng)) throw new ApiError(400, 'Please choose a valid drop location');
+
+    // Reject a trip that goes nowhere (~11 m at this latitude).
+    if (Math.abs(pLat - dLat) < 0.0001 && Math.abs(pLng - dLng) < 0.0001) {
+      throw new ApiError(400, 'Pickup and drop cannot be the same place');
+    }
+
+    const allowedPayments = ['cash', 'upi', 'card', 'wallet'];
+    const paymentMethod = (req.body.payment_method || 'cash').toString().toLowerCase();
+    if (!allowedPayments.includes(paymentMethod)) {
+      throw new ApiError(400, 'Unsupported payment method');
+    }
+    req.body.payment_method = paymentMethod;
+
+    const allowedModes = ['single', 'sharing'];
+    if (req.body.ride_mode && !allowedModes.includes(req.body.ride_mode)) {
+      throw new ApiError(400, 'Unsupported ride type');
+    }
+
+    const route = await getRoute(pLat, pLng, dLat, dLng);
     const rideMode = req.body.ride_mode || 'single';
     // Always use the server-calculated route. Trusting req.body.route_distance
     // let the app send a hardcoded 5000m, so the booked fare did not match the estimate.
@@ -59,12 +93,12 @@ module.exports = {
     const driverEarnings = parseFloat((totalFare - commissionAmount).toFixed(2));
     const ride = await Ride.create({
       customer_id: customer.id,
-      pickup_latitude: req.body.pickup_latitude,
-      pickup_longitude: req.body.pickup_longitude,
+      pickup_latitude: pLat,
+      pickup_longitude: pLng,
       pickup_address: req.body.pickup_address,
       pickup_place_id: req.body.pickup_place_id,
-      drop_latitude: req.body.drop_latitude,
-      drop_longitude: req.body.drop_longitude,
+      drop_latitude: dLat,
+      drop_longitude: dLng,
       drop_address: req.body.drop_address,
       drop_place_id: req.body.drop_place_id,
       route_distance: route.distance_meters,
@@ -155,6 +189,20 @@ module.exports = {
     });
     return success(res, { ride }, ride ? 'Active ride' : 'No active ride');
   }),
+  // Confirm the signed-in user is actually part of this ride.
+  // Without this, ANY logged-in user could read or cancel ANY ride just by
+  // knowing its id - exposing both parties' names, the driver's phone number,
+  // pickup/drop addresses and the ride OTP.
+  _assertRideParticipant: async (ride, req) => {
+    if (req.userRole === 'admin') return;
+    const customer = await Customer.findOne({ where: { user_id: req.userId } });
+    if (customer && ride.customer_id === customer.id) return;
+    const driver = await Driver.findOne({ where: { user_id: req.userId } });
+    if (driver && ride.driver_id === driver.id) return;
+    // Same 404 as a missing ride, so ids cannot be probed for existence.
+    throw new ApiError(404, 'Ride not found');
+  },
+
   getRideDetails: asyncHandler(async (req, res) => {
     const ride = await Ride.findByPk(req.params.id, {
       include: [
@@ -166,6 +214,7 @@ module.exports = {
       ]
     });
     if (!ride) throw new ApiError(404, 'Ride not found');
+    await module.exports._assertRideParticipant(ride, req);
     return success(res, { ride }, 'Ride details');
   }),
   getRideHistory: asyncHandler(async (req, res) => {
@@ -235,6 +284,7 @@ module.exports = {
   cancelRide: asyncHandler(async (req, res) => {
     const ride = await Ride.findByPk(req.params.id);
     if (!ride) throw new ApiError(404, 'Ride not found');
+    await module.exports._assertRideParticipant(ride, req);
     if (!['pending', 'searching', 'driver_assigned', 'scheduled', 'no_driver_found', 'driver_arrived'].includes(ride.status)) throw new ApiError(400, 'Cannot cancel at this stage');
     const oldStatus = ride.status;
     ride.status = 'cancelled';
