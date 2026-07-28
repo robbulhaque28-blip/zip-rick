@@ -186,10 +186,23 @@ async function customerRoom(ride) {
     });
 
     // Ride Status Updates (Driver)
+    // Confirm this driver actually owns the ride before letting them change
+    // its state. These handlers only checked userRole, so ANY signed-in
+    // driver could advance or complete SOMEONE ELSE'S ride just by sending
+    // its id - marking it arrived, started or completed, and in the last
+    // case crediting themselves the earnings. chat:send already guards this
+    // way; the ride lifecycle events did not.
+    const driverOwnsRide = async (ride) => {
+      if (!ride || !ride.driver_id) return false;
+      const d = await Driver.findOne({ where: { user_id: userId }, attributes: ['id'] });
+      return !!(d && ride.driver_id === d.id);
+    };
+
     socket.on('ride:arrived', async (data) => {
       if (userRole !== 'driver') return;
       const { ride_id } = data;
       const ride = await Ride.findByPk(ride_id);
+      if (!(await driverOwnsRide(ride))) return;
       if (ride && ride.status === 'driver_assigned') {
         ride.status = 'driver_arrived';
         ride.driver_arrived_at = new Date();
@@ -214,6 +227,7 @@ async function customerRoom(ride) {
       if (userRole !== 'driver') return;
       const { ride_id } = data;
       const ride = await Ride.findByPk(ride_id);
+      if (!(await driverOwnsRide(ride))) return;
       if (ride && ride.status === 'driver_arrived') {
         ride.status = 'started';
         ride.ride_started_at = new Date();
@@ -238,6 +252,7 @@ async function customerRoom(ride) {
       if (userRole !== 'driver') return;
       const { ride_id } = data;
       const ride = await Ride.findByPk(ride_id);
+      if (!(await driverOwnsRide(ride))) return;
       if (ride && ride.status === 'started') {
         ride.status = 'completed';
         ride.ride_completed_at = new Date();
