@@ -11,13 +11,26 @@ class RideMatchingService {
   }
 
   async findNearbyDrivers(lat, lng, radiusKm = 2, limit = 10) {
+    // Ignore drivers whose position has gone stale. The query used to check
+    // only that current_latitude was not null, so a driver whose app was
+    // killed hours ago still matched at their last known spot - the customer
+    // waited on someone who could never respond, and the ride eventually
+    // timed out as no_driver_found.
+    //
+    // The app refreshes position every 20 m of movement AND on a 60s
+    // heartbeat, so 5 minutes tolerates several missed beats before a driver
+    // is treated as gone.
+    const STALE_AFTER_MINUTES = 5;
+    const freshSince = new Date(Date.now() - STALE_AFTER_MINUTES * 60 * 1000);
+
     const drivers = await Driver.findAll({
       where: {
         is_online: true,
         is_available: true,
         registration_status: 'approved',
         current_ride_id: null,
-        current_latitude: { [Op.ne]: null }
+        current_latitude: { [Op.ne]: null },
+        last_location_update: { [Op.gte]: freshSince }
       },
       include: [
         { association: 'user', attributes: ['id', 'full_name', 'phone', 'avatar_url'] },

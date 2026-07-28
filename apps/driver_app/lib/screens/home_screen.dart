@@ -239,7 +239,22 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   void _startPolling() { _pollTimer?.cancel(); _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _pollForRides()); }
   void _stopPolling() { _pollTimer?.cancel(); _pollTimer = null; }
 
+  DateTime? _lastHeartbeat;
+
+  /// Re-send the current position periodically even when the driver has not
+  /// moved. The location stream only fires after 20 m of movement, so a driver
+  /// parked waiting for work would otherwise never refresh their position and
+  /// would look "stale" to the server.
+  void _heartbeatLocation() {
+    if (!_isOnline || _currentLoc == null) return;
+    final now = DateTime.now();
+    if (_lastHeartbeat != null && now.difference(_lastHeartbeat!).inSeconds < 60) return;
+    _lastHeartbeat = now;
+    _sendLocation();
+  }
+
   Future<void> _pollForRides() async {
+    _heartbeatLocation();
     // While on a ride, poll its status instead of looking for new requests.
     if (_hasActiveRide) { await _loadActiveRide(); return; }
     if (!_isOnline || _showingRideRequest) return;
