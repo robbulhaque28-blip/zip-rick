@@ -350,20 +350,30 @@ async function customerRoom(ride) {
 
         if (!isParticipant) return;
 
-        const chatMessage = await ChatMessage.create({
-          ride_id,
-          sender_id: userId,
-          sender_role: userRole,
-          message,
-          message_type,
-        });
-
+        // Resolve the recipient BEFORE saving. ChatMessage.receiver_id is
+        // allowNull:false, but this create() never set it - so every message
+        // threw a validation error inside the surrounding try/catch and was
+        // silently swallowed. Chat has never delivered a single message.
+        // `sender_role` and `message_type` are not columns on this table and
+        // are dropped by Sequelize; they are still emitted to the clients.
         const otherUserId =
           userRole === 'customer'
             ? await _getDriverUserId(ride.driver_id)
             : await _getCustomerUserId(ride.customer_id);
 
-        if (otherUserId) {
+        if (!otherUserId) {
+          socket.emit('chat:error', { ride_id, message: 'The other party is not available yet' });
+          return;
+        }
+
+        const chatMessage = await ChatMessage.create({
+          ride_id,
+          sender_id: userId,
+          receiver_id: otherUserId,
+          message,
+        });
+
+        {
           io.to(`user:${otherUserId}`).emit('chat:received', {
             id: chatMessage.id,
             ride_id,
@@ -390,7 +400,7 @@ async function customerRoom(ride) {
     socket.on('chat:mark_read', async (data) => {
       const { ride_id } = data;
       await ChatMessage.update(
-        { is_read: true, read_at: new Date() },
+        { is_read: true },
         { where: { ride_id, sender_id: { [require('sequelize').Op.ne]: userId }, is_read: false } }
       );
     });
