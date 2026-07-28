@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
@@ -35,7 +36,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   @override
   void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); _fetchLocation(); _connectSocket(); _loadProfile(); _loadCommission(); }
   @override
-  void dispose() { WidgetsBinding.instance.removeObserver(this); _pollTimer?.cancel(); _posSub?.cancel(); _socket?.disconnect(); _socket?.dispose(); super.dispose(); }
+  void dispose() { _stopRequestAlert(); WidgetsBinding.instance.removeObserver(this); _pollTimer?.cancel(); _posSub?.cancel(); _socket?.disconnect(); _socket?.dispose(); super.dispose(); }
 
   Future<void> _connectSocket() async {
     final t = await ApiService.getToken(); if (t == null) return;
@@ -44,7 +45,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
     _socket!.on('ride:new_request', (d) {
       if (mounted && !_hasActiveRide) {
         final id = (d is Map) ? d['ride_id']?.toString() ?? '' : '';
-        if (id.isNotEmpty && !_declinedRideIds.contains(id)) setState(() { _rideRequest = d as Map<String, dynamic>; _showingRideRequest = true; });
+        if (id.isNotEmpty && !_declinedRideIds.contains(id)) {
+          setState(() { _rideRequest = d as Map<String, dynamic>; _showingRideRequest = true; });
+          _playRequestAlert();
+        }
       }
     });
     _socket!.on('ride:accept_error', (d) {
@@ -59,7 +63,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       setState(() { _acceptPending = false; _hasActiveRide = true; });
       _loadActiveRide();
     });
-    _socket!.on('ride:taken', (d) { if (mounted && _showingRideRequest) setState(() { _showingRideRequest = false; _rideRequest = null; }); });
+    _socket!.on('ride:taken', (d) { if (mounted && _showingRideRequest) { _stopRequestAlert(); setState(() { _showingRideRequest = false; _rideRequest = null; }); } });
     _socket!.on('ride:status_updated', (d) {
       if (!mounted) return;
       _loadActiveRide();
@@ -68,7 +72,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       if (!mounted) return;
       _loadActiveRide();
     });
-    _socket!.on('ride:cancelled', (d) { if (mounted) setState(() { _hasActiveRide = false; _activeRide = null; _showingRideRequest = false; _rideRequest = null; }); });
+    _socket!.on('ride:cancelled', (d) { if (mounted) { _stopRequestAlert(); setState(() { _hasActiveRide = false; _activeRide = null; _showingRideRequest = false; _rideRequest = null; }); } });
     _socket!.on('chat:received', (d) {
       if (d is Map) {
         setState(() => _chatMessages.add(d as Map<String, dynamic>));
@@ -263,7 +267,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       if (r['data']?['rides'] != null) {
         for (final r2 in (r['data']['rides'] as List)) {
           final id = (r2 as Map)['id']?.toString() ?? '';
-          if (!_declinedRideIds.contains(id)) { if (mounted) setState(() { _rideRequest = r2 as Map<String, dynamic>; _showingRideRequest = true; }); return; }
+          if (!_declinedRideIds.contains(id)) {
+            if (mounted) {
+              setState(() { _rideRequest = r2 as Map<String, dynamic>; _showingRideRequest = true; });
+              _playRequestAlert();
+            }
+            return;
+          }
         }
       }
     } catch (_) {}
@@ -277,6 +287,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       return;
     }
     final rideId = (_rideRequest!['ride_id'] ?? _rideRequest!['id'])?.toString();
+    _stopRequestAlert();
     setState(() { _acceptPending = true; _showingRideRequest = false; });
     _socket!.emit('ride:accept', {'ride_id': rideId});
 
@@ -299,6 +310,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   void _rejectRide() {
     final id = _rideRequest?['ride_id']?.toString() ?? _rideRequest?['id']?.toString() ?? '';
     if (id.isNotEmpty) _declinedRideIds.add(id);
+    _stopRequestAlert();
     setState(() { _showingRideRequest = false; _rideRequest = null; });
   }
 
@@ -382,6 +394,29 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
         streamCtrl: _chatStreamCtrl,
       ),
     );
+  }
+
+  static const MethodChannel _alertChannel = MethodChannel('com.vybe.driver/alert');
+
+  /// Sound + vibrate when a ride request arrives.
+  ///
+  /// A request used to appear silently, so a driver not staring at the screen
+  /// simply missed it and the booking timed out. Handled natively with
+  /// Android's built-in notification tone, so no audio package or bundled
+  /// sound file is needed. Played on the alarm stream so it is still audible
+  /// when the phone is on silent.
+  Future<void> _playRequestAlert() async {
+    try {
+      await _alertChannel.invokeMethod('rideRequestAlert');
+    } catch (_) {
+      // Never let a missing platform channel break the ride request.
+    }
+  }
+
+  Future<void> _stopRequestAlert() async {
+    try {
+      await _alertChannel.invokeMethod('stopAlert');
+    } catch (_) {}
   }
 
   void _openRideMap() {
