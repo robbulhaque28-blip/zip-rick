@@ -42,7 +42,9 @@ module.exports = {
     const fare = await FareService.calculateFare({ distanceMeters: route.distance_meters, durationSeconds: route.duration_seconds, ride_mode: rideMode });
     let promoDiscount = 0, promoApplied = false;
     if (req.body.promo_code) { const p = await FareService.applyPromo(fare.total_fare, req.body.promo_code); promoDiscount = p.discount; promoApplied = p.promo_applied; }
-    return success(res, { ...fare, promo_discount: promoDiscount, promo_applied: promoApplied, final_fare: parseFloat((fare.total_fare - promoDiscount).toFixed(2)), route }, 'Fare estimated');
+    // Whole rupees only, and the estimate must match what booking charges.
+    const finalFare = FareService.roundFare(fare.total_fare - promoDiscount);
+    return success(res, { ...fare, total_fare: finalFare, promo_discount: promoDiscount, promo_applied: promoApplied, final_fare: finalFare, route }, 'Fare estimated');
   }),
   bookRide: asyncHandler(async (req, res) => {
     const customer = await Customer.findOne({ where: { user_id: req.userId } });
@@ -130,7 +132,11 @@ module.exports = {
     const fare = await FareService.calculateFare({ distanceMeters: route.distance_meters, durationSeconds: route.duration_seconds, ride_mode: rideMode });
     let promoDiscount = 0, promoCodeId = null;
     if (req.body.promo_code) { const p = await FareService.applyPromo(fare.total_fare, req.body.promo_code); promoDiscount = p.discount; promoCodeId = p.promo_code_id; }
-    const totalFare = parseFloat((fare.total_fare - promoDiscount).toFixed(2));
+    // The customer always pays a whole rupee - same rule as the estimate, so
+    // the quoted price and the charged price can never differ.
+    const totalFare = FareService.roundFare(fare.total_fare - promoDiscount);
+    // Commission stays exact: 10% of the rounded fare (Rs 46 -> Rs 4.60).
+    // Only the customer-facing amount is rounded.
     const commissionAmount = parseFloat((totalFare * 0.10).toFixed(2));
     const driverEarnings = parseFloat((totalFare - commissionAmount).toFixed(2));
     const ride = await Ride.create({

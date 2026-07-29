@@ -12,6 +12,24 @@ const fareRates = Object.freeze({
   sharing_multiplier: 0.7,
 });
 
+/**
+ * Round a fare to a whole rupee.
+ *
+ * Business rule: anything up to and including .50 rounds DOWN, anything
+ * above .50 rounds UP. So 45.30 and 45.50 both become 45, while 45.51 and
+ * 45.60 become 46.
+ *
+ * Note this is NOT Math.round(), which would push 45.50 up to 46. Using
+ * Math.ceil(x - 0.5) puts the .50 case in the customer's favour, and keeps
+ * cash amounts clean for drivers - no paise to hand back.
+ */
+function roundFare(amount) {
+  const n = parseFloat(amount);
+  if (!Number.isFinite(n)) return 0;
+  if (n <= 0) return 0;
+  return Math.max(0, Math.ceil(n - 0.5));
+}
+
 async function getRates() {
   try {
     const { SystemSetting } = require("../models");
@@ -40,12 +58,15 @@ async function calculateFare(params) {
   
   let total = b + df + tf + nc + pc;
   if (total < rates.minimum_fare) total = parseFloat(rates.minimum_fare);
-  
+
+  // Customers and drivers only ever deal in whole rupees.
+  total = roundFare(total);
+
   return {
     base_fare: b, distance_fare: df, time_fare: tf,
     night_charges: nc, peak_charges: pc,
     waiting_charges: 0, promo_discount: 0,
-    total_fare: parseFloat(total.toFixed(2)),
+    total_fare: total,
     ride_mode: isSharing ? 'sharing' : 'single'
   };
 }
@@ -88,8 +109,10 @@ async function applyPromo(totalFare, code) {
     }
 
     // Never discount below zero, and never more than the fare itself.
+    // Rounded to a whole rupee so a rounded fare minus the discount is still
+    // a whole rupee - the customer never sees paise.
     discount = Math.max(0, Math.min(discount, fare));
-    discount = parseFloat(discount.toFixed(2));
+    discount = roundFare(discount);
     if (discount <= 0) return none;
 
     return { discount, promo_applied: true, promo_code_id: promo.id };
@@ -99,4 +122,4 @@ async function applyPromo(totalFare, code) {
   }
 }
 
-module.exports = { calculateFare, getRates, applyPromo };
+module.exports = { calculateFare, getRates, applyPromo, roundFare };
